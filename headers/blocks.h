@@ -1,11 +1,10 @@
 #ifndef BLOCKS_H
 #define BLOCKS_H
 #include <SDL.h>
-#include <SDL_TTF.h>
+#include <SDL_ttf.h>
 #include <SDL_mixer.h>
 #include <stdio.h>
 #include <math.h>
-#include <windows.h>
 #include <vector>
 using namespace std;
 class blocks

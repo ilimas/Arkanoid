@@ -1,10 +1,9 @@
-#define SDL_MAIN_HANDLED
+//#define SDL_MAIN_HANDLED
 #include <SDL.h>
-#include <SDL_TTF.h>
+#include <SDL_ttf.h>
 #include <SDL_mixer.h>
 #include <stdio.h>
 #include <math.h>
-#include <windows.h>
 #include <stdlib.h>
 #include <time.h>
 #include <vector>
@@ -12,12 +11,80 @@
 #include "bblock.h"
 #include "shar.h"
 #include "image.h"
+ #include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
+#include <algorithm>
+#include <atomic>
+
+#define endlessLoop while(true)
+
 using namespace std;
+
+extern TTF_Font* fnt;
+std::deque<SDL_Event> eventQueue;
+std::mutex queueMutex;
+std::atomic<bool> gameStartFlag = false, gamePaused = false, gameOver = false;
+std::condition_variable eventCondition;
+
+
+// Поток обработки событий
+void eventThread()
+{
+    SDL_Event event;
+    while (true)
+    {
+        if(gameOver) return;
+        while (SDL_PollEvent(&event))
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            eventQueue.push_back(event);
+            eventCondition.notify_one(); // Уведомляем основной поток
+        }
+        SDL_Delay(1); // Уменьшаем нагрузку на CPU
+    }
+}
+
+
+void pauseThread()
+{
+    SDL_Event event;
+    while(true)
+    {
+        if(gameOver) return;
+        if(gameStartFlag)
+        {
+            bool emptyQueue;
+            {
+                std::unique_lock<std::mutex> lock(queueMutex);
+                emptyQueue = eventQueue.empty();
+            }
+            if(!emptyQueue)
+            {
+                event = eventQueue.front();
+                eventQueue.pop_front();
+                if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
+                {
+                    gamePaused = !gamePaused;
+                }
+                else if(gamePaused && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN)
+                {
+                    gameStartFlag = false;
+                    gamePaused = false;
+                    gameOver = true;
+                    return;
+                }
+            }
+        }
+    }
+}
+
 
 int main(int argc, char* args[])
 {
     int tstart=SDL_GetTicks();
-    int n=0, gameover=0, begin=0, score=0;
+    int n=0, score=0;
     Mix_Music *music = NULL;
     SDL_Event event;
     int mx, my;
@@ -46,44 +113,56 @@ int main(int argc, char* args[])
     b_block bblock(ren);
     image D(ren);
     if(Mix_OpenAudio(22050, MIX_DEFAULT_FORMAT, 2, 4096)==-1) return 2;
-    music = Mix_LoadMUS("shrek.wav");
+    music = Mix_LoadMUS("../music/shrek.wav");
     if(!music) return 1;
     SDL_RenderClear(ren);
     if(Mix_PlayMusic(music, -1)==-1) return 1;
-    while(1)
+    endlessLoop
     {
-        while(1)
+        std::thread eventProcessing(eventThread);
+        eventProcessing.detach();
+        endlessLoop
         {
             D.draw_menu(n);
             SDL_RenderPresent(ren);
             SDL_GetMouseState(&mx, &my);
             if(mx>=450 && mx<=600 && my<=130 && my>=100) n=0;
             else if(mx>=450 && mx<=600 && my<=170 && my>=140) n=1;
-            if(SDL_PollEvent(&event))
             {
-                if (event.type == SDL_MOUSEBUTTONDOWN  &&  event.button.button==SDL_BUTTON_LEFT && mx<=600 && mx>=450 && my>=100 && my<=170)
+                std::unique_lock<std::mutex> lock(queueMutex);
+                eventCondition.wait(lock, [](){ return !eventQueue.empty(); });
+                while(!eventQueue.empty())
                 {
-                    if(n==0)
+                    event = eventQueue.front();
+                    eventQueue.pop_front();
+                    if (event.type == SDL_MOUSEBUTTONDOWN  &&  event.button.button==SDL_BUTTON_LEFT && mx<=600 && mx>=450 && my>=100 && my<=170)
                     {
-                        bl.load_level();
-                        break;
-                    }
-                    else if(n==1)
-                    {
-                        Mix_FreeMusic(music);
-                        SDL_DestroyRenderer(ren);
-                        SDL_DestroyWindow(win);
-                        Mix_CloseAudio();
-                        TTF_Quit();
-                        SDL_Quit();
-                        return 3;
+                        if(n==0)
+                        {
+                            bl.load_level();
+                            goto jmp_game_start;
+                        }
+                        else if(n==1)
+                        {
+                            Mix_FreeMusic(music);
+                            SDL_DestroyRenderer(ren);
+                            SDL_DestroyWindow(win);
+                            Mix_CloseAudio();
+                            TTF_CloseFont(fnt);
+                            TTF_Quit();
+                            SDL_Quit();
+                            return 3;
+                        }
                     }
                 }
             }
         }
-        while(!gameover)
+jmp_game_start:
+        SDL_RenderPresent(ren);
+        SDL_GetMouseState(&mx, &my);
+        while(!gameOver)
         {
-            if(!begin)
+            if(!gameStartFlag)
             {
                 D.draw_background();
                 bblock.Draw_Block();
@@ -91,38 +170,36 @@ int main(int argc, char* args[])
                 sh.Draw(ren);
                 D.draw_begin();
                 SDL_RenderPresent(ren);
-                while(1)
+                while(!gameStartFlag)
                 {
-                    if(SDL_PollEvent(&event))
+                    std::unique_lock<std::mutex> lock(queueMutex);
+                    eventCondition.wait(lock, []() { return !eventQueue.empty(); });
+                    while(!eventQueue.empty())
                     {
-                        if(event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) break;
-                    }
-                }
-                begin=1;
-            }
-            SDL_GetMouseState(&mx, NULL);
-            if(mx>=0 && mx<=540) bblock.setpos(mx);
-            if(SDL_PollEvent(&event))
-            {
-                if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
-                {
-                    D.draw_pause();
-                    SDL_RenderPresent(ren);
-                    while(1)
-                    {
-                        if(SDL_PollEvent(&event))
+                        event = eventQueue.front();
+                        eventQueue.pop_front();
+                        if(event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
                         {
-                            if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN)
-                            {
-                                gameover=1;
-                                break;
-                            }
-                            else if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) break;
+                            gameStartFlag = true;
+                            break;
                         }
                     }
                 }
+                std::thread pauseProcessing(pauseThread);
+                pauseProcessing.detach();
             }
-            if(begin)
+            if(gamePaused)
+            {
+                D.draw_pause();
+                SDL_RenderPresent(ren);
+                while(gamePaused);
+            }
+            SDL_GetMouseState(&mx, NULL);
+            if(mx>=0 && mx<=540)
+            {
+                bblock.setpos(mx);
+            }
+            if(gameStartFlag)
             {
                 //SDL_ShowCursor(SDL_DISABLE);
                 D.draw_background();
@@ -134,7 +211,7 @@ int main(int argc, char* args[])
                     {
                         if(SDL_PollEvent(&event) && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN)
                         {
-                            gameover=1;
+                            gameOver = true;
                             break;
                         }
                     }
@@ -218,20 +295,25 @@ int main(int argc, char* args[])
                 {
                     if(SDL_PollEvent(&event) && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN)
                     {
-                        gameover=1;
+                        gameOver = true;
                         break;
                     }
                 }
             }
         }
         SDL_ShowCursor(SDL_ENABLE);
-        begin=0;
-        gameover=0;
+        gameStartFlag = false;
+        gameOver = false;
+        gamePaused = false;
         score=0;
         tstart=SDL_GetTicks();
         bl.setmain();
         sh.setmain();
         bblock.setmain();
+        {
+            std::unique_lock<std::mutex> lock(queueMutex);
+            eventQueue.clear();
+        }
     }
     Mix_FreeMusic(music);
     SDL_DestroyRenderer(ren);

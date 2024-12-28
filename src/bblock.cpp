@@ -1,15 +1,14 @@
 #include "bblock.h"
 #include <SDL.h>
-#include <SDL_TTF.h>
+#include <SDL_ttf.h>
 #include <SDL_mixer.h>
 #include <stdio.h>
 #include <math.h>
-#include <windows.h>
 #include <vector>
 b_block::b_block(SDL_Renderer *ren)
 {
     render=ren;
-    img=SDL_LoadBMP("2621.bmp");
+    img=SDL_LoadBMP("../img/2621.bmp");
     SDL_SetColorKey(img, 1, SDL_MapRGB(img->format, 255, 255, 255));
     timg=SDL_CreateTextureFromSurface(render, img);
     SDL_FreeSurface(img);

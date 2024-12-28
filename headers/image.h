@@ -1,10 +1,10 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 #include <SDL.h>
-#include <SDL_TTF.h>
+#include <SDL_ttf.h>
 #include <stdio.h>
-#include <windows.h>
 #include <stdlib.h>
+
 class image
 {
     SDL_Surface *background, *menu, *text;

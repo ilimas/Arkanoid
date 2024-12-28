@@ -1,16 +1,22 @@
 #include <SDL.h>
-#include <SDL_TTF.h>
+#include <SDL_ttf.h>
 #include <stdio.h>
-#include <windows.h>
 #include <stdlib.h>
+#include <stdexcept>
 #include "image.h"
+
+
+TTF_Font* fnt{nullptr};
+
 image::image(SDL_Renderer *ren)
 {
+    fnt = TTF_OpenFont("../ttf/Casper_B.ttf", 30);
+    if (!fnt) throw std::runtime_error("Unable to load font");
     render=ren;
-    background=SDL_LoadBMP("back.bmp");
+    background=SDL_LoadBMP("../img/back.bmp");
     tbackground=SDL_CreateTextureFromSurface(ren, background);
     SDL_FreeSurface(background);
-    menu=SDL_LoadBMP("menu.bmp");
+    menu=SDL_LoadBMP("../img/menu.bmp");
     tmenu=SDL_CreateTextureFromSurface(ren, menu);
     SDL_FreeSurface(menu);
 }
@@ -21,11 +27,8 @@ image::~image()
 }
 void image::draw_begin()
 {
-    TTF_Font *fnt=NULL;
     SDL_Rect r;
     SDL_Color color;
-    fnt=TTF_OpenFont("Casper_B.ttf", 25);
-    if (!fnt) printf("Unable to load font \n");
     color.r=255;
     color.g=185;
     color.b=15;
@@ -38,15 +41,11 @@ void image::draw_begin()
     SDL_RenderCopy(render, ftext, NULL, &r);
     SDL_FreeSurface(text);
     SDL_DestroyTexture(ftext);
-    TTF_CloseFont(fnt);
 }
 void image::draw_pause()
 {
-    TTF_Font *fnt=NULL;
     SDL_Rect r;
     SDL_Color color;
-    fnt=TTF_OpenFont("Casper_B.ttf", 30);
-    if (!fnt) printf("Unable to load font \n");
     color.r=255;
     color.g=185;
     color.b=15;
@@ -73,7 +72,6 @@ void image::draw_pause()
     SDL_RenderCopy(render, ftext, NULL, &r);
     SDL_FreeSurface(text);
     SDL_DestroyTexture(ftext);
-    TTF_CloseFont(fnt);
 }
 void image::draw_background()
 {
@@ -81,12 +79,9 @@ void image::draw_background()
 }
 void image::level_cleared(double a)
 {
-    TTF_Font *fnt=NULL;
     SDL_Rect r;
     SDL_Color color;
     char buf[200];
-    fnt=TTF_OpenFont("Casper_B.ttf", 20);
-    if (!fnt) printf("Unable to load font \n");
     color.r=255;
     color.g=185;
     color.b=15;
@@ -100,15 +95,11 @@ void image::level_cleared(double a)
     SDL_RenderCopy(render, ftext, NULL, &r);
     SDL_FreeSurface(text);
     SDL_DestroyTexture(ftext);
-    TTF_CloseFont(fnt);
 }
 void image::draw_end()
 {
-    TTF_Font *fnt=NULL;
     SDL_Rect r;
     SDL_Color color;
-    fnt=TTF_OpenFont("Casper_B.ttf", 20);
-    if (!fnt) printf("Unable to load font \n");
     color.r=255;
     color.g=185;
     color.b=15;
@@ -121,15 +112,12 @@ void image::draw_end()
     SDL_RenderCopy(render, ftext, NULL, &r);
     SDL_FreeSurface(text);
     SDL_DestroyTexture(ftext);
-    TTF_CloseFont(fnt);
 }
+
 void image::draw_menu(int menu)
 {
-    TTF_Font *fnt=NULL;
     SDL_Rect r;
     SDL_Color color;
-    fnt=TTF_OpenFont("Casper_B.ttf", 30);
-    if (!fnt) printf("Unable to load font \n");
     SDL_RenderCopy(render, tmenu, NULL, NULL);
     if(menu==0)
     {
@@ -180,5 +168,4 @@ void image::draw_menu(int menu)
         SDL_FreeSurface(text);
     }
     SDL_DestroyTexture(ftext);
-    TTF_CloseFont(fnt);
 }

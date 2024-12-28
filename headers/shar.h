@@ -1,11 +1,10 @@
 #ifndef SHAR_H
 #define SHAR_H
 #include <SDL.h>
-#include <SDL_TTF.h>
+#include <SDL_ttf.h>
 #include <SDL_mixer.h>
 #include <stdio.h>
 #include <math.h>
-#include <windows.h>
 #include <vector>
 class shar
 {
