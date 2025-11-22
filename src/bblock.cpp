@@ -4,11 +4,12 @@
 #include <SDL_mixer.h>
 #include <stdio.h>
 #include <math.h>
-#include <vector>
-b_block::b_block(SDL_Renderer *ren)
+
+
+Paddel::Paddel(SDL_Renderer *ren)
 {
     render=ren;
-    img=SDL_LoadBMP("../img/2621.bmp");
+    img=SDL_LoadBMP(SNACKS_DIR "/img/2621.bmp");
     SDL_SetColorKey(img, 1, SDL_MapRGB(img->format, 255, 255, 255));
     timg=SDL_CreateTextureFromSurface(render, img);
     SDL_FreeSurface(img);
@@ -17,30 +18,30 @@ b_block::b_block(SDL_Renderer *ren)
     nblock.w=100;
     nblock.h=10;
 }
-b_block::~b_block()
+Paddel::~Paddel()
 {
     SDL_DestroyTexture(timg);
 }
-int b_block::rety()
+int Paddel::rety()
 {
     return nblock.y;
 }
-void b_block::setmain()
+void Paddel::setmain()
 {
     nblock.x=270;
     nblock.y=460;
     nblock.w=100;
     nblock.h=10;
 }
-int b_block::retx()
+int Paddel::retx()
 {
     return nblock.x;
 }
-void b_block::Draw_Block()
+void Paddel::Draw_Block()
 {
     SDL_RenderCopy(render, timg, NULL, &nblock);
 }
-void b_block::setpos(int x)
+void Paddel::setpos(int x)
 {
     nblock.x=x;
 }

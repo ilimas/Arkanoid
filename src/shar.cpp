@@ -1,65 +1,56 @@
 #include "shar.h"
+#include "bblock.h"
+#include "blocks.h"
+#include "utils.h"
 #include <SDL.h>
-#include <SDL_ttf.h>
 #include <SDL_mixer.h>
-#include <stdio.h>
+#include <SDL_rect.h>
+#include <SDL_ttf.h>
 #include <math.h>
-#include <vector>
-shar::shar()
+#include <optional>
+
+Ball::Ball(SDL_Rect bounds_)
 {
-    RECT.x=320;
-    RECT.y=448;
-    gy=1;
-    gx=2;
-    radius=0;
-    alf=4;
-    fx=0;
+    bounds = bounds_;
+    ratio = (1.f * bounds.w) / bounds.h;
+    position.x = 320;
+    position.y = 448;
+    destination = Vec2{0.0, -1.0 * ratio};
+    radius = 0;
+    alf = std::numbers::pi / 2;
+    fx = 0;
 }
-void shar::Draw(SDL_Renderer *rend)
+void Ball::Draw(SDL_Renderer *rend)
 {
-    radius=10;
+    radius = 10;
     SDL_SetRenderDrawColor(rend, 192, 192, 192, 255);
     SDL_RenderFillCircle(rend, radius);
     SDL_SetRenderDrawColor(rend, 255, 0, 0, 255);
-    radius=8;
+    radius = 8;
     SDL_RenderFillCircle(rend, radius);
 }
-void shar::setgy()
-{
-    gy=-gy;
-}
-void shar::setgx()
-{
-    gx=-gx;
-}
-int shar::retfx()
-{
-    return fx;
-}
-int shar::retalf()
-{
-    return alf;
-}
-void shar::setfx(int x)
-{
-    fx=x;
-}
+void Ball::setgy() { destination.y = -destination.y; }
+void Ball::setgx() { destination.x = -destination.x; }
+int Ball::retfx() { return fx; }
+double Ball::retalf() { return alf; }
+void Ball::setfx(int x) { fx = x; }
 
-void shar::setalf(int x)
-{
-    alf=x;
-}
-void shar::SDL_RenderFillCircle(SDL_Renderer* rend, int rad)
+void Ball::setalf(double x) { alf = x; }
+void Ball::SDL_RenderFillCircle(SDL_Renderer *rend, int rad)
 {
     int x = rad;
     int y = 0;
     int radiusError = 1 - x;
     while (x >= y)
     {
-        SDL_RenderDrawLine(rend, x + RECT.x, y + RECT.y, -x + RECT.x, y + RECT.y);
-        SDL_RenderDrawLine(rend, y + RECT.x, x + RECT.y, -y + RECT.x, x + RECT.y);
-        SDL_RenderDrawLine(rend, -x + RECT.x, -y + RECT.y, x + RECT.x, -y + RECT.y);
-        SDL_RenderDrawLine(rend, -y + RECT.x, -x + RECT.y, y + RECT.x, -x + RECT.y);
+        SDL_RenderDrawLine(rend, x + position.x, y + position.y, -x + position.x,
+                           y + position.y);
+        SDL_RenderDrawLine(rend, y + position.x, x + position.y, -y + position.x,
+                           x + position.y);
+        SDL_RenderDrawLine(rend, -x + position.x, -y + position.y, x + position.x,
+                           -y + position.y);
+        SDL_RenderDrawLine(rend, -y + position.x, -x + position.y, y + position.x,
+                           -x + position.y);
         y++;
         if (radiusError < 0)
             radiusError += 2 * y + 1;
@@ -70,35 +61,84 @@ void shar::SDL_RenderFillCircle(SDL_Renderer* rend, int rad)
         }
     }
 }
-int shar::rety()
+
+bool Ball::out_of_bounds() { return out_of_bounds_h() || out_of_bounds_v(); }
+
+bool Ball::out_of_bounds_h()
 {
-    return RECT.y;
+    double pos_x = get_position().x;
+    if (std::abs(pos_x - bounds.x) <= 10 || std::abs(pos_x - bounds.w) <= 10)
+    {
+        return true;
+    }
+    return false;
 }
-int shar::retx()
+
+bool Ball::out_of_bounds_v()
 {
-    return RECT.x;
+    double pos_y = get_position().y;
+    if (std::abs(pos_y - bounds.y) <= 10 || std::abs(pos_y - bounds.h) <= 10)
+    {
+        return true;
+    }
+    return false;
 }
-int shar::retgx()
+
+void Ball::revert_position()
 {
-    return gx;
+    if (out_of_bounds_h())
+        setgx();
+    if (out_of_bounds_v())
+        setgy();
 }
-int shar::retgy()
+
+std::optional<Vec2> Ball::touches(Paddel &block)
 {
-    return gy;
+    double pos_x = get_position().x;
+    double pos_y = get_position().y;
+    Vec2 paddle_vec_a{(double)block.retx(), (double)block.rety()};
+    Vec2 paddle_vec_b{(double)block.retx() + 100, (double)block.rety()};
+    Vec2 closest_point =
+        closestPointOnSegment(paddle_vec_a, paddle_vec_b, get_position());
+    if ((closest_point - get_position()).length() < radius)
+        return closest_point;
+    return std::nullopt;
 }
-void shar::setmain()
+
+std::optional<Vec2> Ball::touches(SingleBlock &block)
 {
-    RECT.x=320;
-    RECT.y=448;
-    gy=1;
-    gx=2;
-    radius=0;
-    alf=4;
-    fx=0;
+    Vec2 closest_point = closestPoint(block.r, get_position());
+    if ((closest_point - get_position()).length() < radius)
+        return closest_point;
+    return std::nullopt;
 }
-void shar::next_step()
+
+Vec2 Ball::get_position() { return position; }
+
+Vec2 Ball::get_destination() { return destination; }
+
+void Ball::set_destination(Vec2 new_destination)
 {
-    RECT.x+=2*gx*fx;
-    if(!fx) RECT.y-=alf*gy*(fx+1);
-    else RECT.y-=alf*gy;
+    destination = new_destination;
+}
+
+void Ball::set_position(Vec2 new_position)
+{
+    position = new_position;
+}
+
+void Ball::setmain()
+{
+    position.x = 320;
+    position.y = 448;
+    destination = Vec2{0, -1.0 * ratio};
+    radius = 0;
+    alf = std::numbers::pi / 2;
+    fx = 0;
+}
+
+void Ball::next_step()
+{
+    constexpr float boost = 4.0;
+    position += boost * destination;
 }
