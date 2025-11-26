@@ -1,14 +1,15 @@
-#include "image.h"
+#include "FrontendManager.h"
 #include <SDL.h>
 #include <SDL_ttf.h>
+#include <iostream>
 #include <stdexcept>
-#include <stdio.h>
-#include <stdlib.h>
-
-TTF_Font *fnt{nullptr};
 
 FrontendManager::FrontendManager(SDL_Renderer *ren)
 {
+    if (TTF_Init() != 0)
+    {
+        std::cerr << "TTF_Init error\n";
+    }
     fnt = TTF_OpenFont(SNACKS_DIR "/ttf/Casper_B.ttf", 30);
     if (!fnt)
         throw std::runtime_error("Unable to load font");
@@ -20,19 +21,26 @@ FrontendManager::FrontendManager(SDL_Renderer *ren)
     tmenu = SDL_CreateTextureFromSurface(ren, menu);
     SDL_FreeSurface(menu);
 }
+
 FrontendManager::~FrontendManager()
 {
+    TTF_CloseFont(fnt);
+    fnt = nullptr;
+    TTF_Quit();
     SDL_DestroyTexture(tmenu);
     SDL_DestroyTexture(tbackground);
 }
-void FrontendManager::draw_begin()
+
+void FrontendManager::draw_welcome_text()
 {
     SDL_Rect r;
     SDL_Color color;
     color.r = 255;
     color.g = 185;
     color.b = 15;
+    TTF_SetFontSize(fnt, 20);
     text = TTF_RenderUTF8_Blended(fnt, "Нажмите левую кнопку мыши, чтобы начать", color);
+    TTF_SetFontSize(fnt, 30);
     ftext = SDL_CreateTextureFromSurface(render, text);
     r.x = 80;
     r.y = 250;
@@ -42,6 +50,7 @@ void FrontendManager::draw_begin()
     SDL_FreeSurface(text);
     SDL_DestroyTexture(ftext);
 }
+
 void FrontendManager::draw_pause()
 {
     SDL_Rect r;
@@ -73,10 +82,12 @@ void FrontendManager::draw_pause()
     SDL_FreeSurface(text);
     SDL_DestroyTexture(ftext);
 }
+
 void FrontendManager::draw_background()
 {
     SDL_RenderCopy(render, tbackground, NULL, NULL);
 }
+
 void FrontendManager::level_cleared(double a)
 {
     SDL_Rect r;
@@ -85,8 +96,10 @@ void FrontendManager::level_cleared(double a)
     color.r = 255;
     color.g = 185;
     color.b = 15;
+    TTF_SetFontSize(fnt, 20);
     sprintf(buf, "Уровень пройден, ваш ранк: %.2lf, нажмите Enter для возврата в меню", a);
     text = TTF_RenderUTF8_Blended(fnt, buf, color);
+    TTF_SetFontSize(fnt, 30);
     ftext = SDL_CreateTextureFromSurface(render, text);
     r.x = 30;
     r.y = 130;
@@ -96,6 +109,7 @@ void FrontendManager::level_cleared(double a)
     SDL_FreeSurface(text);
     SDL_DestroyTexture(ftext);
 }
+
 void FrontendManager::draw_end()
 {
     SDL_Rect r;
@@ -103,7 +117,9 @@ void FrontendManager::draw_end()
     color.r = 255;
     color.g = 185;
     color.b = 15;
+    TTF_SetFontSize(fnt, 20);
     text = TTF_RenderUTF8_Blended(fnt, "Игра окончена, нажмите Enter для возврата в меню", color);
+    TTF_SetFontSize(fnt, 30);
     ftext = SDL_CreateTextureFromSurface(render, text);
     r.x = 80;
     r.y = 130;

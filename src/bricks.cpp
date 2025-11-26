@@ -1,16 +1,12 @@
-#include "blocks.h"
-#include "shar.h"
-#include "utils.h"
+#include "Bricks.h"
+#include "Ball.h"
+#include "Utils.h"
 #include <SDL.h>
-#include <SDL_mixer.h>
 #include <SDL_rect.h>
-#include <SDL_ttf.h>
-#include <math.h>
-#include <stdlib.h>
-#include <vector>
 
-BlockField::BlockField()
+BlockField::BlockField(SDL_Renderer *ren_)
 {
+    render = ren_;
     for (int i = 0; i < 26; i++)
     {
         for (int j = 0; j < 13; j++)
@@ -19,26 +15,32 @@ BlockField::BlockField()
         }
     }
 }
+
 int BlockField::rety(int i)
 {
     return a[i].r.y;
 }
+
 int BlockField::retx(int i)
 {
     return a[i].r.x;
 }
+
 int BlockField::bsize()
 {
     return (int)a.size();
 }
+
 void BlockField::del(int i)
 {
     a.erase(a.begin() + i);
 }
+
 void BlockField::setmain()
 {
     a.clear();
 }
+
 void BlockField::load_level()
 {
     int i, j, k;
@@ -76,36 +78,39 @@ void BlockField::load_level()
         }
     }
 }
+
 int BlockField::retvar(int i)
 {
     return a[i].var;
 }
+
 void BlockField::minus(int i)
 {
     a[i].var--;
 }
-void BlockField::Draw_Blocks(SDL_Renderer *ren)
+
+void BlockField::draw()
 {
     SDL_Rect r;
     for (int i = 0; i < (int)a.size(); i++)
     {
         if (a[i].var == 1)
-            SDL_SetRenderDrawColor(ren, 202, 255, 112, 255);
+            SDL_SetRenderDrawColor(render, 202, 255, 112, 255);
         else if (a[i].var == 2)
-            SDL_SetRenderDrawColor(ren, 255, 202, 112, 255);
-        SDL_RenderFillRect(ren, &a[i].r);
+            SDL_SetRenderDrawColor(render, 255, 202, 112, 255);
+        SDL_RenderFillRect(render, &a[i].r);
     }
     for (int i = 0; i < (int)a.size(); i++)
     {
         if (a[i].var == 1)
-            SDL_SetRenderDrawColor(ren, 0, 255, 0, 255);
+            SDL_SetRenderDrawColor(render, 0, 255, 0, 255);
         else if (a[i].var == 2)
-            SDL_SetRenderDrawColor(ren, 255, 0, 0, 255);
+            SDL_SetRenderDrawColor(render, 255, 0, 0, 255);
         r.x = a[i].r.x + 2;
         r.y = a[i].r.y + 2;
         r.h = 13;
         r.w = 48;
-        SDL_RenderFillRect(ren, &r);
+        SDL_RenderFillRect(render, &r);
     }
 }
 

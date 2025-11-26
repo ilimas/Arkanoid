@@ -1,9 +1,6 @@
-#include "bblock.h"
+#include "Paddel.h"
 #include <SDL.h>
 #include <SDL_ttf.h>
-#include <SDL_mixer.h>
-#include <stdio.h>
-#include <math.h>
 
 
 Paddel::Paddel(SDL_Renderer *ren)
@@ -37,7 +34,7 @@ int Paddel::retx()
 {
     return nblock.x;
 }
-void Paddel::Draw_Block()
+void Paddel::draw()
 {
     SDL_RenderCopy(render, timg, NULL, &nblock);
 }

@@ -1,19 +1,17 @@
-#ifndef SHAR_H
-#define SHAR_H
-#include "bblock.h"
-#include "blocks.h"
-#include "utils.h"
-#include <SDL.h>
-#include <SDL_mixer.h>
+#ifndef BALL_H
+#define BALL_H
+
+#include "Bricks.h"
+#include "Paddel.h"
+#include "Utils.h"
 #include <SDL_rect.h>
-#include <SDL_ttf.h>
-#include <math.h>
+#include <SDL_render.h>
 #include <optional>
-#include <sys/types.h>
 
 class Ball
 {
     Vec2 position;
+    SDL_Renderer *render;
     SDL_Rect bounds;
     double gy, gx, ratio, alf;
     Vec2 destination{0.0, 1.0};
@@ -22,7 +20,7 @@ class Ball
   public:
     int radius;
 
-    Ball(SDL_Rect bounds_);
+    Ball(SDL_Rect bounds_, SDL_Renderer *ren_);
     bool out_of_bounds();
     bool out_of_bounds_v();
     bool out_of_bounds_h();
@@ -34,8 +32,8 @@ class Ball
     void setfx(int x);
     void setalf(double x);
     void setmain();
-    void Draw(SDL_Renderer *rend);
-    void SDL_RenderFillCircle(SDL_Renderer *rend, int rad);
+    void draw();
+    void render_circle(int rad);
     Vec2 get_position();
     Vec2 get_destination();
     void set_destination(Vec2 new_destination);
@@ -44,4 +42,5 @@ class Ball
     double retalf();
     void next_step();
 };
+
 #endif

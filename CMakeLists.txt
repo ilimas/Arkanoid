@@ -15,7 +15,7 @@ include_directories(${SDL2_INCLUDE_DIRS} ${SDL2_TTF_INCLUDE_DIRS} ${SDL2_MIXER_I
 
 add_definitions(-DSNACKS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/snacks")
 # Source files
-add_executable(Arkanoid src/main.cpp src/bblock.cpp src/blocks.cpp src/image.cpp src/shar.cpp)
+add_executable(Arkanoid src/main.cpp src/Paddel.cpp src/Bricks.cpp src/FrontendManager.cpp src/EventManager.cpp src/Ball.cpp src/Game.cpp)
 
 # Link SDL2 library
 target_link_libraries(Arkanoid SDL2::TTF SDL2::Mixer SDL2::Main)

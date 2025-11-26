@@ -1,10 +1,7 @@
-#ifndef BBLOCK_H
-#define BBLOCK_H
-#include <SDL.h>
-#include <SDL_ttf.h>
-#include <SDL_mixer.h>
-#include <math.h>
+#ifndef PADDEL_H
+#define PADDEL_H
 
+#include <SDL.h>
 
 class Paddel
 {
@@ -12,13 +9,15 @@ class Paddel
     SDL_Surface *img;
     SDL_Texture *timg;
     SDL_Renderer *render;
-public:
+
+  public:
     Paddel(SDL_Renderer *);
     ~Paddel();
     int rety();
     void setmain();
     int retx();
-    void Draw_Block();
+    void draw();
     void setpos(int);
 };
+
 #endif

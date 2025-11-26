@@ -1,11 +1,9 @@
-#ifndef BLOCKS_H
-#define BLOCKS_H
-#include "utils.h"
-#include <SDL.h>
-#include <SDL_mixer.h>
-#include <SDL_ttf.h>
+#ifndef BRICKS_H
+#define BRICKS_H
+
+#include "Utils.h"
+#include <SDL_render.h>
 #include <cstdint>
-#include <math.h>
 #include <vector>
 
 enum class HitSide : uint8_t
@@ -34,10 +32,11 @@ class BlockField
     std::vector<SingleBlock> a;
     SingleBlock temp;
     int map[26][13];
+    SDL_Renderer *render;
 
   public:
-    BlockField();
-    void Draw_Blocks(SDL_Renderer *ren);
+    BlockField(SDL_Renderer *ren_);
+    void draw();
     std::vector<SingleBlock> &getBlocksVector()
     {
         return a;
