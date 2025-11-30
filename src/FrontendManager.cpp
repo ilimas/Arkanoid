@@ -1,5 +1,9 @@
 #include "FrontendManager.h"
 #include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_render.h>
+#include <SDL_rwops.h>
+#include <SDL_stdinc.h>
 #include <SDL_ttf.h>
 #include <iostream>
 #include <stdexcept>
@@ -83,10 +87,7 @@ void FrontendManager::draw_pause()
     SDL_DestroyTexture(ftext);
 }
 
-void FrontendManager::draw_background()
-{
-    SDL_RenderCopy(render, tbackground, NULL, NULL);
-}
+void FrontendManager::draw_background() { SDL_RenderCopy(render, tbackground, NULL, nullptr); }
 
 void FrontendManager::level_cleared(double a)
 {

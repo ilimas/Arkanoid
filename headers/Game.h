@@ -2,6 +2,7 @@
 #define GAME_H
 
 #include "Ball.h"
+#include "BlackHole.h"
 #include "Bricks.h"
 #include "EventManager.h"
 #include "FrontendManager.h"
@@ -24,6 +25,7 @@ class Game
     std::unique_ptr<Paddel> paddel;
     std::unique_ptr<BlockField> bricksField;
     std::unique_ptr<Ball> ball;
+    std::unique_ptr<BlackHole> blackHole;
     EventManager eventManager;
     SDL_Rect bounds;
     SDL_Window *window;

@@ -9,13 +9,27 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/sdl2)
 find_package(SDL2 REQUIRED)
 find_package(SDL2_ttf REQUIRED)
 find_package(SDL2_mixer REQUIRED)
+find_package(SDL2_image REQUIRED)
 
 # Include directories
-include_directories(${SDL2_INCLUDE_DIRS} ${SDL2_TTF_INCLUDE_DIRS} ${SDL2_MIXER_INCLUDE_DIRS} headers)
+include_directories(
+    ${SDL2_INCLUDE_DIRS}
+    ${SDL2_TTF_INCLUDE_DIRS}
+    ${SDL2_MIXER_INCLUDE_DIRS}
+    ${SDL2_image_INCLUDE_DIRS}
+    headers)
 
 add_definitions(-DSNACKS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/snacks")
 # Source files
-add_executable(Arkanoid src/main.cpp src/Paddel.cpp src/Bricks.cpp src/FrontendManager.cpp src/EventManager.cpp src/Ball.cpp src/Game.cpp)
+add_executable(Arkanoid
+    src/main.cpp
+    src/Paddel.cpp
+    src/Bricks.cpp
+    src/FrontendManager.cpp
+    src/EventManager.cpp
+    src/Ball.cpp
+    src/Game.cpp
+    src/BlackHole.cpp)
 
 # Link SDL2 library
-target_link_libraries(Arkanoid SDL2::TTF SDL2::Mixer SDL2::Main)
+target_link_libraries(Arkanoid SDL2::TTF SDL2::Mixer SDL2::Main SDL2::Image)

@@ -26,7 +26,7 @@ int BlockField::retx(int i)
     return a[i].r.x;
 }
 
-int BlockField::bsize()
+int BlockField::remaining()
 {
     return (int)a.size();
 }
@@ -77,6 +77,7 @@ void BlockField::load_level()
             }
         }
     }
+    startingSize = a.size();
 }
 
 int BlockField::retvar(int i)

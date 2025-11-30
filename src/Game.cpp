@@ -1,5 +1,6 @@
 #include "Game.h"
 #include "Ball.h"
+#include "BlackHole.h"
 #include "Bricks.h"
 #include "EventManager.h"
 #include "FrontendManager.h"
@@ -7,19 +8,21 @@
 #include <SDL_mixer.h>
 #include <SDL_rect.h>
 #include <SDL_render.h>
+#include <SDL_timer.h>
+#include <cstdint>
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <memory>
 
-Game::Game() : bounds{0, 0, 640, 480},
-               frontend(nullptr),
-               renderer(nullptr),
-               window(nullptr),
-               music(nullptr)
+Game::Game()
+    : bounds{0, 0, 640, 480}, frontend(nullptr), renderer(nullptr), window(nullptr), music(nullptr)
 {
 }
 
 int Game::run()
 {
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
     {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << "\n";
@@ -52,6 +55,10 @@ int Game::run()
     paddel = std::make_unique<Paddel>(renderer);
     bricksField = std::make_unique<BlockField>(renderer);
     ball = std::make_unique<Ball>(bounds, renderer);
+    blackHole = std::make_unique<BlackHole>(bounds, renderer);
+    uint32_t lastInterval = SDL_GetTicks();
+    uint32_t animationStart = 0;
+    bool animPlaying = false;
     int mx = 0, my = 0;
     int score = 0;
     uint32_t tstart = SDL_GetTicks();
@@ -121,12 +128,14 @@ int Game::run()
             else if (!ball->out_of_bounds())
             {
                 auto &blocks_vector = bricksField->getBlocksVector();
-                for (int i = 0; i < bricksField->bsize(); ++i)
+                for (int i = 0; i < bricksField->remaining(); ++i)
                 {
                     auto &current_block = bricksField->retBlock(i);
-                    if (auto closest_point = ball->touches(current_block); closest_point.has_value())
+                    if (auto closest_point = ball->touches(current_block);
+                        closest_point.has_value())
                     {
-                        HitSide side = current_block.detectHitSide(ball->get_position(), ball->radius);
+                        HitSide side =
+                            current_block.detectHitSide(ball->get_position(), ball->radius);
                         ball->set_destination(current_block.reflectBall(*ball));
                         // auto normal = ball->get_position() - closest_point.value();
                         // auto distance = normal.length();
@@ -146,8 +155,7 @@ int Game::run()
                     Vec2 closest_point_vec = closest_point.value();
                     int paddel_width = 100;
                     double paddel_center_x = paddel->retx() + paddel_width / 2.f;
-                    double offset =
-                        (closest_point_vec.x - paddel_center_x) / (paddel_width / 2.f);
+                    double offset = (closest_point_vec.x - paddel_center_x) / (paddel_width / 2.f);
                     if (offset < -1.f)
                         offset = -1.f;
                     if (offset > 1.f)
@@ -170,8 +178,7 @@ int Game::run()
                     if (new_destination.x < -maxX)
                         new_destination.x = -maxX;
 
-                    ball->set_destination(new_destination.normalized() *
-                                          current_ball_speed);
+                    ball->set_destination(new_destination.normalized() * current_ball_speed);
 
                     Vec2 current_ball_position = ball->get_position();
                     current_ball_position.y = paddel->rety() - ball->radius - 0.1f;
@@ -187,8 +194,12 @@ int Game::run()
             paddel->draw();
             bricksField->draw();
             ball->draw();
+            if (bricksField->remaining() <= bricksField->getStartingSize() * 2 / 3)
+            {
+                blackHole->draw();
+            }
             SDL_RenderPresent(renderer);
-            if (bricksField->bsize() == 0)
+            if (bricksField->remaining() == 0)
             {
                 float elapsed = (SDL_GetTicks() - tstart) / 1000.0f;
                 eventManager.getState().gamePreEnd = true;

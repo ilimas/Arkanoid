@@ -7,20 +7,13 @@
 #include <optional>
 #include <thread>
 
-GameState::GameState() : gameStart(false),
-                         gameWelcome(false),
-                         gamePaused(false),
-                         gameOver(false),
-                         gamePreEnd(false),
-                         gameMenu(true),
-                         menuSelectedItem(0)
+GameState::GameState()
+    : gameStart(false), gameWelcome(false), gamePaused(false), gameOver(false), gamePreEnd(false),
+      gameMenu(true), menuSelectedItem(0)
 {
 }
 
-GameState &EventManager::getState()
-{
-    return currentState;
-}
+GameState &EventManager::getState() { return currentState; }
 
 void EventManager::gameStateReset()
 {
@@ -33,8 +26,7 @@ void EventManager::gameStateReset()
 void EventManager::waitForEvent()
 {
     std::unique_lock<std::mutex> lock(mutex_);
-    condition_.wait(lock, [&]
-                    { return !queue_.empty() || getState().gameOver; });
+    condition_.wait(lock, [&] { return !queue_.empty() || getState().gameOver; });
 }
 
 std::optional<SDL_Event> EventManager::popEvent()
