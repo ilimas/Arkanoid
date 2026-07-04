@@ -4,9 +4,7 @@
 #include <iostream>
 
 // TODO: Gamepad support (WSL???)
-// TODO: Black hole logic
 // TODO: Difficility level
-// TODO: Hidden areas
 
 int main(int argc, char *argv[])
 {

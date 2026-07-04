@@ -31,8 +31,9 @@ class BlockField
 {
     std::vector<SingleBlock> a;
     uint32_t startingSize{};
+    uint32_t destructibleStartingSize{};
     SingleBlock temp;
-    int map[26][13];
+    int map[26][16];
     SDL_Renderer *render;
 
   public:
@@ -43,11 +44,13 @@ class BlockField
     int retx(int i);
     int retvar(int i);
     SingleBlock &retBlock(int i) { return a[i]; }
-    void load_level();
+    void load_level(int level = 0);
     void minus(int i);
     void setmain();
     int remaining();
     void del(int i);
+    int destructibleCount();
     uint32_t getStartingSize() { return startingSize; }
+    uint32_t getDestructibleStartingSize() { return destructibleStartingSize; }
 };
 #endif

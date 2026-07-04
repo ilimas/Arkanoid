@@ -10,9 +10,9 @@ Paddel::Paddel(SDL_Renderer *ren)
     SDL_SetColorKey(img, 1, SDL_MapRGB(img->format, 255, 255, 255));
     timg=SDL_CreateTextureFromSurface(render, img);
     SDL_FreeSurface(img);
-    nblock.x=270;
-    nblock.y=460;
-    nblock.w=100;
+    nblock.x=400;
+    nblock.y=600;
+    nblock.w=120;
     nblock.h=10;
 }
 Paddel::~Paddel()
@@ -25,9 +25,9 @@ int Paddel::rety()
 }
 void Paddel::setmain()
 {
-    nblock.x=270;
-    nblock.y=460;
-    nblock.w=100;
+    nblock.x=400;
+    nblock.y=600;
+    nblock.w=120;
     nblock.h=10;
 }
 int Paddel::retx()

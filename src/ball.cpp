@@ -6,6 +6,7 @@
 #include <SDL_mixer.h>
 #include <SDL_rect.h>
 #include <SDL_ttf.h>
+#include <algorithm>
 #include <math.h>
 #include <optional>
 
@@ -14,8 +15,8 @@ Ball::Ball(SDL_Rect bounds_, SDL_Renderer *ren_)
     render = ren_;
     bounds = bounds_;
     ratio = (1.f * bounds.w) / bounds.h;
-    position.x = 320;
-    position.y = 448;
+    position.x = 450;
+    position.y = 585;
     destination = Vec2{0.0, -1.0 * ratio};
     radius = 10;
     alf = std::numbers::pi / 2;
@@ -24,10 +25,16 @@ Ball::Ball(SDL_Rect bounds_, SDL_Renderer *ren_)
 void Ball::draw()
 {
     radius = 10;
-    SDL_SetRenderDrawColor(render, 192, 192, 192, 255);
+    if (fireBallActive)
+        SDL_SetRenderDrawColor(render, 255, 120, 0, 255);
+    else
+        SDL_SetRenderDrawColor(render, 192, 192, 192, 255);
     render_circle(radius);
     radius = 8;
-    SDL_SetRenderDrawColor(render, 255, 0, 0, 255);
+    if (fireBallActive)
+        SDL_SetRenderDrawColor(render, 255, 220, 0, 255);
+    else
+        SDL_SetRenderDrawColor(render, 255, 0, 0, 255);
     render_circle(radius);
     radius = 10;
 }
@@ -89,9 +96,17 @@ bool Ball::out_of_bounds_v()
 void Ball::revert_position()
 {
     if (out_of_bounds_h())
+    {
         setgx();
+        position.x = std::clamp(position.x, (double)bounds.x + radius + 1.0,
+                                             (double)bounds.w - radius - 1.0);
+    }
     if (out_of_bounds_v())
+    {
         setgy();
+        position.y = std::clamp(position.y, (double)bounds.y + radius + 1.0,
+                                             (double)bounds.h - radius - 1.0);
+    }
 }
 
 std::optional<Vec2> Ball::touches(Paddel &block)
@@ -99,7 +114,7 @@ std::optional<Vec2> Ball::touches(Paddel &block)
     double pos_x = get_position().x;
     double pos_y = get_position().y;
     Vec2 paddle_vec_a{(double)block.retx(), (double)block.rety()};
-    Vec2 paddle_vec_b{(double)block.retx() + 100, (double)block.rety()};
+    Vec2 paddle_vec_b{(double)block.retx() + block.retw(), (double)block.rety()};
     Vec2 closest_point =
         closestPointOnSegment(paddle_vec_a, paddle_vec_b, get_position());
     if ((closest_point - get_position()).length() < radius)
@@ -131,12 +146,25 @@ void Ball::set_position(Vec2 new_position)
 
 void Ball::setmain()
 {
-    position.x = 320;
-    position.y = 448;
+    position.x = 450;
+    position.y = 585;
     destination = Vec2{0, -1.0 * ratio};
     radius = 0;
     alf = std::numbers::pi / 2;
     fx = 0;
+    fireBallActive = false;
+}
+
+void Ball::activateFireBall(uint32_t durationMs)
+{
+    fireBallActive = true;
+    fireBallEnd = SDL_GetTicks() + durationMs;
+}
+
+void Ball::updateFireBall()
+{
+    if (fireBallActive && SDL_GetTicks() >= fireBallEnd)
+        fireBallActive = false;
 }
 
 void Ball::next_step()

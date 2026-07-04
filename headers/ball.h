@@ -6,6 +6,8 @@
 #include "Utils.h"
 #include <SDL_rect.h>
 #include <SDL_render.h>
+#include <SDL_timer.h>
+#include <cstdint>
 #include <optional>
 
 class Ball
@@ -16,6 +18,8 @@ class Ball
     double gy, gx, ratio, alf;
     Vec2 destination{0.0, 1.0};
     int fx;
+    bool fireBallActive{false};
+    uint32_t fireBallEnd{0};
 
   public:
     int radius;
@@ -41,6 +45,9 @@ class Ball
     int retfx();
     double retalf();
     void next_step();
+    bool isFireBall() const { return fireBallActive; }
+    void activateFireBall(uint32_t durationMs);
+    void updateFireBall();
 };
 
 #endif

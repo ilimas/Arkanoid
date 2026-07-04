@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 project(Arkanoid)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+file(CREATE_LINK
+  "${CMAKE_BINARY_DIR}/compile_commands.json"
+  "${CMAKE_SOURCE_DIR}/compile_commands.json"
+  SYMBOLIC
+)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 

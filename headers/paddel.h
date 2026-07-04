@@ -16,6 +16,7 @@ class Paddel
     int rety();
     void setmain();
     int retx();
+    int retw() { return nblock.w; }
     void draw();
     void setpos(int);
 };
