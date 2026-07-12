@@ -1,6 +1,7 @@
 #include "Ball.h"
 #include "Paddel.h"
 #include "Bricks.h"
+#include "ProceduralTextures.h"
 #include "Utils.h"
 #include <SDL.h>
 #include <SDL_mixer.h>
@@ -21,22 +22,22 @@ Ball::Ball(SDL_Rect bounds_, SDL_Renderer *ren_)
     radius = 10;
     alf = std::numbers::pi / 2;
     fx = 0;
+    texNormal = ProceduralTextures::makeSphereTexture(render, radius * 2, SDL_Color{225, 60, 60, 255});
+    texFire = ProceduralTextures::makeSphereTexture(render, radius * 2, SDL_Color{255, 165, 20, 255});
 }
+
+Ball::~Ball()
+{
+    SDL_DestroyTexture(texNormal);
+    SDL_DestroyTexture(texFire);
+}
+
 void Ball::draw()
 {
     radius = 10;
-    if (fireBallActive)
-        SDL_SetRenderDrawColor(render, 255, 120, 0, 255);
-    else
-        SDL_SetRenderDrawColor(render, 192, 192, 192, 255);
-    render_circle(radius);
-    radius = 8;
-    if (fireBallActive)
-        SDL_SetRenderDrawColor(render, 255, 220, 0, 255);
-    else
-        SDL_SetRenderDrawColor(render, 255, 0, 0, 255);
-    render_circle(radius);
-    radius = 10;
+    SDL_Texture *tex = fireBallActive ? texFire : texNormal;
+    SDL_Rect dst{(int)(position.x - radius), (int)(position.y - radius), radius * 2, radius * 2};
+    SDL_RenderCopy(render, tex, nullptr, &dst);
 }
 void Ball::setgy() { destination.y = -destination.y; }
 void Ball::setgx() { destination.x = -destination.x; }
@@ -45,31 +46,6 @@ double Ball::retalf() { return alf; }
 void Ball::setfx(int x) { fx = x; }
 
 void Ball::setalf(double x) { alf = x; }
-void Ball::render_circle(int rad)
-{
-    int x = rad;
-    int y = 0;
-    int radiusError = 1 - x;
-    while (x >= y)
-    {
-        SDL_RenderDrawLine(render, x + position.x, y + position.y, -x + position.x,
-                           y + position.y);
-        SDL_RenderDrawLine(render, y + position.x, x + position.y, -y + position.x,
-                           x + position.y);
-        SDL_RenderDrawLine(render, -x + position.x, -y + position.y, x + position.x,
-                           -y + position.y);
-        SDL_RenderDrawLine(render, -y + position.x, -x + position.y, y + position.x,
-                           -x + position.y);
-        y++;
-        if (radiusError < 0)
-            radiusError += 2 * y + 1;
-        else
-        {
-            x--;
-            radiusError += 2 * (y - x + 1);
-        }
-    }
-}
 
 bool Ball::out_of_bounds() { return out_of_bounds_h() || out_of_bounds_v(); }
 

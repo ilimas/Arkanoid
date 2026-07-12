@@ -1,5 +1,6 @@
 #include "Bricks.h"
 #include "Ball.h"
+#include "ProceduralTextures.h"
 #include "Utils.h"
 #include <SDL.h>
 #include <SDL_rect.h>
@@ -12,6 +13,17 @@ BlockField::BlockField(SDL_Renderer *ren_)
     for (int i = 0; i < 26; i++)
         for (int j = 0; j < 16; j++)
             map[i][j] = 0;
+
+    texGreen = ProceduralTextures::makeBrickTexture(render, 50, 15, SDL_Color{96, 214, 110, 255});
+    texOrange = ProceduralTextures::makeBrickTexture(render, 50, 15, SDL_Color{255, 150, 60, 255});
+    texStone = ProceduralTextures::makeBrickTexture(render, 50, 15, SDL_Color{128, 132, 145, 255});
+}
+
+BlockField::~BlockField()
+{
+    SDL_DestroyTexture(texGreen);
+    SDL_DestroyTexture(texOrange);
+    SDL_DestroyTexture(texStone);
 }
 
 int BlockField::rety(int i) { return a[i].r.y; }
@@ -127,30 +139,10 @@ void BlockField::minus(int i) { a[i].var--; }
 
 void BlockField::draw()
 {
-    SDL_Rect r;
     for (int i = 0; i < (int)a.size(); i++)
     {
-        if (a[i].var > 0 && a[i].var == 1)
-            SDL_SetRenderDrawColor(render, 202, 255, 112, 255);
-        else if (a[i].var > 0 && a[i].var == 2)
-            SDL_SetRenderDrawColor(render, 255, 202, 112, 255);
-        else if (a[i].var < 0) // stone
-            SDL_SetRenderDrawColor(render, 80, 80, 90, 255);
-        SDL_RenderFillRect(render, &a[i].r);
-    }
-    for (int i = 0; i < (int)a.size(); i++)
-    {
-        if (a[i].var > 0 && a[i].var == 1)
-            SDL_SetRenderDrawColor(render, 0, 255, 0, 255);
-        else if (a[i].var > 0 && a[i].var == 2)
-            SDL_SetRenderDrawColor(render, 255, 0, 0, 255);
-        else if (a[i].var < 0) // stone
-            SDL_SetRenderDrawColor(render, 140, 140, 155, 255);
-        r.x = a[i].r.x + 2;
-        r.y = a[i].r.y + 2;
-        r.h = 13;
-        r.w = 48;
-        SDL_RenderFillRect(render, &r);
+        SDL_Texture *tex = (a[i].var < 0) ? texStone : (a[i].var == 1 ? texGreen : texOrange);
+        SDL_RenderCopy(render, tex, nullptr, &a[i].r);
     }
 }
 

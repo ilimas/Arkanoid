@@ -36,12 +36,14 @@ class BlockField
     SingleBlock temp;
     int map[26][16];
     SDL_Renderer *render;
+    SDL_Texture *texGreen, *texOrange, *texStone;
     std::vector<int> levelBag;
     size_t bagIndex{0};
     std::mt19937 rng{std::random_device{}()};
 
   public:
     BlockField(SDL_Renderer *ren_);
+    ~BlockField();
     void draw();
     std::vector<SingleBlock> &getBlocksVector() { return a; }
     int rety(int i);

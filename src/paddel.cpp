@@ -1,4 +1,5 @@
 #include "Paddel.h"
+#include "ProceduralTextures.h"
 #include <SDL.h>
 #include <SDL_ttf.h>
 
@@ -6,14 +7,11 @@
 Paddel::Paddel(SDL_Renderer *ren)
 {
     render=ren;
-    img=SDL_LoadBMP(SNACKS_DIR "/img/2621.bmp");
-    SDL_SetColorKey(img, 1, SDL_MapRGB(img->format, 255, 255, 255));
-    timg=SDL_CreateTextureFromSurface(render, img);
-    SDL_FreeSurface(img);
     nblock.x=400;
     nblock.y=600;
     nblock.w=120;
     nblock.h=10;
+    timg = ProceduralTextures::makeBarTexture(render, nblock.w, nblock.h, SDL_Color{70, 190, 255, 255});
 }
 Paddel::~Paddel()
 {

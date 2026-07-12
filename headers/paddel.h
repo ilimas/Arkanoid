@@ -6,7 +6,6 @@
 class Paddel
 {
     SDL_Rect nblock;
-    SDL_Surface *img;
     SDL_Texture *timg;
     SDL_Renderer *render;
 

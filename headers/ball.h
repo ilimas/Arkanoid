@@ -20,11 +20,14 @@ class Ball
     int fx;
     bool fireBallActive{false};
     uint32_t fireBallEnd{0};
+    SDL_Texture *texNormal{nullptr};
+    SDL_Texture *texFire{nullptr};
 
   public:
     int radius;
 
     Ball(SDL_Rect bounds_, SDL_Renderer *ren_);
+    ~Ball();
     bool out_of_bounds();
     bool out_of_bounds_v();
     bool out_of_bounds_h();
@@ -37,7 +40,6 @@ class Ball
     void setalf(double x);
     void setmain();
     void draw();
-    void render_circle(int rad);
     Vec2 get_position();
     Vec2 get_destination();
     void set_destination(Vec2 new_destination);
