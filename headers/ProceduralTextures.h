@@ -17,6 +17,15 @@ SDL_Texture *makeBarTexture(SDL_Renderer *ren, int w, int h, SDL_Color base);
 
 // Glossy shaded sphere with an offset specular highlight - used for the ball.
 SDL_Texture *makeSphereTexture(SDL_Renderer *ren, int diameter, SDL_Color base);
+
+// Vertical dark navy-to-purple gradient with a soft central glow, used as the
+// base wash for the procedural starfield background.
+SDL_Texture *makeNebulaTexture(SDL_Renderer *ren, int w, int h);
+
+// Horizontal streak: transparent/thin tail on the left fading into a bright,
+// whitened glowing head on the right. Rotate with SDL_RenderCopyEx (pivot at
+// the right edge) to point the head along a comet's direction of travel.
+SDL_Texture *makeCometTexture(SDL_Renderer *ren, int length, int thickness, SDL_Color color);
 } // namespace ProceduralTextures
 
 #endif

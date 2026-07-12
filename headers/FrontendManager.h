@@ -2,9 +2,11 @@
 #define FRONTEND_MANAGER_H
 
 #include "PlayerDatabase.h"
+#include "Starfield.h"
 #include <SDL.h>
 #include <SDL_ttf.h>
 #include <array>
+#include <memory>
 #include <stdlib.h>
 #include <string>
 #include <vector>
@@ -34,9 +36,11 @@ class FrontendManager
         SDL_Color color;
     };
 
-    SDL_Texture *tbackground, *tmenu;
+    SDL_Texture *tmenu;
     SDL_Renderer *render;
     TTF_Font *fnt;
+    std::unique_ptr<Starfield> starfield;
+    Uint32 lastBackgroundTicks;
 
     TextCache hudScoreCache, hudLevelCache;
     TextCache menuTitleCache;

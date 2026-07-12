@@ -38,9 +38,9 @@ FrontendManager::FrontendManager(SDL_Renderer *ren)
     render = ren;
     SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
 
-    SDL_Surface *background = SDL_LoadBMP(SNACKS_DIR "/img/back.bmp");
-    tbackground = SDL_CreateTextureFromSurface(ren, background);
-    SDL_FreeSurface(background);
+    starfield = std::make_unique<Starfield>(render, UILayout::ScreenW, UILayout::ScreenH);
+    lastBackgroundTicks = SDL_GetTicks();
+
     SDL_Surface *menuSurf = SDL_LoadBMP(SNACKS_DIR "/img/menu.bmp");
     tmenu = SDL_CreateTextureFromSurface(ren, menuSurf);
     SDL_FreeSurface(menuSurf);
@@ -52,7 +52,6 @@ FrontendManager::~FrontendManager()
     fnt = nullptr;
     TTF_Quit();
     SDL_DestroyTexture(tmenu);
-    SDL_DestroyTexture(tbackground);
 }
 
 // Rasterizes `utf8` at `fontSize` only when the text or size actually changed since
@@ -214,7 +213,14 @@ void FrontendManager::draw_pause()
     });
 }
 
-void FrontendManager::draw_background() { SDL_RenderCopy(render, tbackground, NULL, nullptr); }
+void FrontendManager::draw_background()
+{
+    Uint32 now = SDL_GetTicks();
+    double dt = std::min((now - lastBackgroundTicks) / 1000.0, 0.05);
+    lastBackgroundTicks = now;
+    starfield->update(dt);
+    starfield->draw();
+}
 
 void FrontendManager::level_cleared(double a)
 {

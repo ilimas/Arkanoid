@@ -37,7 +37,8 @@ add_executable(Arkanoid
     src/Game.cpp
     src/BlackHole.cpp
     src/PlayerDatabase.cpp
-    src/ProceduralTextures.cpp)
+    src/ProceduralTextures.cpp
+    src/Starfield.cpp)
 
 # Link SDL2 library
 target_link_libraries(Arkanoid SDL2::TTF SDL2::Mixer SDL2::Main SDL2::Image)

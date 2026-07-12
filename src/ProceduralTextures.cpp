@@ -141,4 +141,67 @@ SDL_Texture *makeSphereTexture(SDL_Renderer *ren, int diameter, SDL_Color base)
     return finish(ren, surf);
 }
 
+SDL_Texture *makeNebulaTexture(SDL_Renderer *ren, int w, int h)
+{
+    SDL_Surface *surf = newSurface(w, h);
+    Uint32 *px = static_cast<Uint32 *>(surf->pixels);
+    const SDL_PixelFormat *fmt = surf->format;
+    SDL_Color top{8, 10, 24, 255};
+    SDL_Color bottom{22, 15, 42, 255};
+    float cx = w / 2.0f, cy = h * 0.4f;
+    float maxDist = std::sqrt(cx * cx + cy * cy);
+
+    for (int y = 0; y < h; y++)
+    {
+        float t = y / float(h > 1 ? h - 1 : 1);
+        float baseR = top.r + (bottom.r - top.r) * t;
+        float baseG = top.g + (bottom.g - top.g) * t;
+        float baseB = top.b + (bottom.b - top.b) * t;
+        for (int x = 0; x < w; x++)
+        {
+            float dx = x - cx, dy = y - cy;
+            float dist = std::sqrt(dx * dx + dy * dy) / maxDist;
+            float glow = std::max(0.0f, 1.0f - dist) * 0.2f;
+            Uint8 r = clamp8(baseR + glow * 45.0f);
+            Uint8 g = clamp8(baseG + glow * 38.0f);
+            Uint8 b = clamp8(baseB + glow * 60.0f);
+            px[y * w + x] = SDL_MapRGBA(fmt, r, g, b, 255);
+        }
+    }
+    return finish(ren, surf);
+}
+
+SDL_Texture *makeCometTexture(SDL_Renderer *ren, int length, int thickness, SDL_Color color)
+{
+    SDL_Surface *surf = newSurface(length, thickness);
+    Uint32 *px = static_cast<Uint32 *>(surf->pixels);
+    const SDL_PixelFormat *fmt = surf->format;
+    float cy = thickness / 2.0f;
+
+    for (int y = 0; y < thickness; y++)
+    {
+        for (int x = 0; x < length; x++)
+        {
+            float nx = x / float(length > 1 ? length - 1 : 1); // 0 = tail, 1 = head
+            float radius = 0.5f + (thickness * 0.5f) * std::pow(nx, 1.5f);
+            float dy = std::fabs((y + 0.5f) - cy);
+            if (dy > radius)
+            {
+                px[y * length + x] = 0;
+                continue;
+            }
+            float edgeSoft = 1.0f - dy / radius;
+            float fade = std::pow(nx, 1.6f);
+            float alpha = fade * edgeSoft * 255.0f;
+
+            float whiten = std::max(0.0f, nx - 0.75f) / 0.25f;
+            Uint8 r = clamp8(color.r + whiten * (255 - color.r));
+            Uint8 g = clamp8(color.g + whiten * (255 - color.g));
+            Uint8 b = clamp8(color.b + whiten * (255 - color.b));
+            px[y * length + x] = SDL_MapRGBA(fmt, r, g, b, clamp8(alpha));
+        }
+    }
+    return finish(ren, surf);
+}
+
 } // namespace ProceduralTextures
