@@ -32,6 +32,7 @@ int Game::run()
         std::cerr << "SDL_Init Error: " << SDL_GetError() << "\n";
         return 1;
     }
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
     double windowScale = 2.0;
     SDL_Rect displayBounds;
     if (SDL_GetDisplayUsableBounds(0, &displayBounds) == 0)
