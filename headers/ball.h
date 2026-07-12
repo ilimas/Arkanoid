@@ -44,7 +44,7 @@ class Ball
     void set_position(Vec2 new_position);
     int retfx();
     double retalf();
-    void next_step();
+    void next_step(double dt);
     bool isFireBall() const { return fireBallActive; }
     void activateFireBall(uint32_t durationMs);
     void updateFireBall();

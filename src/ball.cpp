@@ -167,8 +167,11 @@ void Ball::updateFireBall()
         fireBallActive = false;
 }
 
-void Ball::next_step()
+void Ball::next_step(double dt)
 {
-    constexpr float boost = 6.0;
-    position += boost * destination;
+    // destination's magnitude is the "canonical speed" set on paddle bounce (see
+    // Game.cpp), so this is a plain px/sec speed scale, not a per-frame step -
+    // the ball now covers the same distance per second regardless of frame rate.
+    constexpr double speedPxPerSec = 360.0;
+    position += destination * (speedPxPerSec * dt);
 }

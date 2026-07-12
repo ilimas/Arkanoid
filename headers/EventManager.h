@@ -2,61 +2,57 @@
 #define EVENT_MANAGER_H
 
 #include <SDL_events.h>
-#include <atomic>
-#include <condition_variable>
-#include <deque>
-#include <mutex>
-#include <optional>
+#include <cstdint>
 #include <string>
-#include <thread>
 
 struct GameState
 {
     GameState();
 
-    std::atomic<bool> gameStart;
-    std::atomic<bool> gameWelcome;
-    std::atomic<bool> gamePaused;
-    std::atomic<bool> gameOver;
-    std::atomic<bool> gamePreEnd;
-    std::atomic<bool> gameMenu;
-    std::atomic<bool> gameNameInput;
-    std::atomic<bool> gameLeaderboard;
-    std::atomic<bool> appQuit;
-    std::atomic_uint8_t menuSelectedItem;
+    bool gameStart;
+    bool gameWelcome;
+    bool gamePaused;
+    bool gameOver;
+    bool gamePreEnd;
+    bool gameMenu;
+    bool gameNameInput;
+    bool gameLeaderboard;
+    bool appQuit;
+    uint8_t menuSelectedItem;
 };
 
+// Polls SDL input once per frame from the main thread (no background threads
+// or queues). Mouse position/buttons and the Escape/Enter keys are read as
+// continuous device state and edge-detected here, the same way a modern
+// engine's Input.GetKeyDown/GetMouseButtonDown works - SDL_GetMouseState and
+// SDL_GetKeyboardState reflect the OS pointer/keyboard directly, which is more
+// reliable across platforms than depending on discrete SDL_Event delivery for
+// every single press. Free-form text entry (SDL_TEXTINPUT) has no polling
+// equivalent, so the name-input screen still reads that off the event queue.
 class EventManager
 {
   public:
     EventManager() = default;
     void gameStateReset();
-    void waitForEvent();
-    std::optional<SDL_Event> popEvent();
-    bool tryPopEvent(SDL_Event &out);
-    void clearQueue();
-    void startCaptureEvents();
-    void stopCapture();
+    void pollEvents();
     GameState &getState();
     void setLogicalScale(double scaleX, double scaleY);
     void clearNameInput();
     std::string getNameInputText();
 
   private:
-    void acceptEventsWorker(std::stop_token stopToken);
-    void processEventsWorker(std::stop_token stopToken);
-    void getLogicalMousePos(int &x, int &y);
+    void handleTextInputEvent(const SDL_Event &event);
+    void dispatch(int mx, int my, bool clicked, bool escPressed, bool returnPressed);
+    void toLogical(int rawX, int rawY, int &x, int &y) const;
 
     GameState currentState{};
-    std::deque<SDL_Event> queue_;
-    std::mutex mutex_;
-    std::condition_variable condition_;
-    std::jthread pollThread;
-    std::jthread eventThread;
     double scaleX_{1.0};
     double scaleY_{1.0};
-    std::mutex nameMutex_;
     std::string nameBuffer_;
+
+    bool mouseLeftDownPrev_ = false;
+    bool escDownPrev_ = false;
+    bool returnDownPrev_ = false;
 };
 
 #endif

@@ -74,9 +74,6 @@ int Game::run()
     bricksField = std::make_unique<BlockField>(renderer);
     ball = std::make_unique<Ball>(bounds, renderer);
     blackHole = std::make_unique<BlackHole>(bounds, renderer);
-    uint32_t lastInterval = SDL_GetTicks();
-    uint32_t animationStart = 0;
-    bool animPlaying = false;
     bool ballStuckInHole = false;
     uint32_t ballStuckTime = 0;
     double ballStuckSpeed = 0.0;
@@ -91,13 +88,14 @@ int Game::run()
     long long totalBlocksThisRun = 0;
     uint32_t tstart = SDL_GetTicks();
     SDL_ShowCursor(SDL_ENABLE);
-    eventManager.startCaptureEvents();
     while (!eventManager.getState().gameOver)
     {
         while (eventManager.getState().gameMenu)
         {
-            frontend->draw_menu(eventManager.getState().menuSelectedItem.load());
+            eventManager.pollEvents();
+            frontend->draw_menu(eventManager.getState().menuSelectedItem);
             SDL_RenderPresent(renderer);
+            SDL_Delay(1);
         }
         if (eventManager.getState().gameOver)
             break;
@@ -106,10 +104,10 @@ int Game::run()
         {
             while (eventManager.getState().gameLeaderboard)
             {
+                eventManager.pollEvents();
                 frontend->draw_background();
                 frontend->draw_leaderboard(playerDb.getSorted());
                 SDL_RenderPresent(renderer);
-                SDL_Delay(8);
             }
             if (eventManager.getState().gameOver)
                 break;
@@ -121,10 +119,10 @@ int Game::run()
             SDL_StartTextInput();
             while (eventManager.getState().gameNameInput)
             {
+                eventManager.pollEvents();
                 frontend->draw_background();
                 frontend->draw_name_input(eventManager.getNameInputText());
                 SDL_RenderPresent(renderer);
-                SDL_Delay(8);
             }
             SDL_StopTextInput();
             if (eventManager.getState().gameOver)
@@ -137,7 +135,6 @@ int Game::run()
             totalBlocksThisRun = 0;
         }
 
-        eventManager.startCaptureEvents();
         eventManager.getState().gameStart = false;
         eventManager.getState().gamePaused = false;
         eventManager.getState().gameOver = false;
@@ -154,27 +151,47 @@ int Game::run()
 
         while (eventManager.getState().gameWelcome)
         {
+            eventManager.pollEvents();
             frontend->draw_background();
             paddel->draw();
             bricksField->draw();
             ball->draw();
             frontend->draw_welcome_text();
             SDL_RenderPresent(renderer);
-            SDL_Delay(8);
         }
 
         SDL_ShowCursor(SDL_DISABLE);
+        uint32_t lastPhysicsTicks = SDL_GetTicks();
+        bool justResumed = false;
         while (eventManager.getState().gameStart)
         {
+            bool wasPaused = eventManager.getState().gamePaused;
             while (eventManager.getState().gamePaused)
             {
+                eventManager.pollEvents();
                 frontend->draw_background();
                 frontend->draw_pause();
                 SDL_RenderPresent(renderer);
-                SDL_Delay(8);
             }
+            if (wasPaused)
+                justResumed = true;
             if (eventManager.getState().gameOver == true)
                 break;
+
+            eventManager.pollEvents();
+
+            // Frame-rate independent timestep: everything below moves at a
+            // px/sec rate scaled by dt, not a fixed amount per rendered frame,
+            // so gameplay speed stays the same regardless of the actual frame
+            // rate. dt is 0 for the first frame after a pause so the paused
+            // duration itself never turns into a single oversized physics step,
+            // and it's clamped so any other hitch can't tunnel the ball through
+            // the paddle/bricks either.
+            uint32_t nowTicks = SDL_GetTicks();
+            double dt = justResumed ? 0.0 : std::min((nowTicks - lastPhysicsTicks) / 1000.0, 0.05);
+            lastPhysicsTicks = nowTicks;
+            justResumed = false;
+
             SDL_GetMouseState(&mx, &my);
             float logicalMx, logicalMy;
             SDL_RenderWindowToLogical(renderer, mx, my, &logicalMx, &logicalMy);
@@ -190,9 +207,9 @@ int Game::run()
                 eventManager.getState().gamePreEnd = true;
                 while (eventManager.getState().gamePreEnd)
                 {
+                    eventManager.pollEvents();
                     frontend->draw_end();
                     SDL_RenderPresent(renderer);
-                    SDL_Delay(8);
                     frontend->draw_background();
                 };
                 break;
@@ -315,7 +332,7 @@ int Game::run()
 
             ball->updateFireBall();
             if (!ballStuckInHole)
-                ball->next_step();
+                ball->next_step(dt);
 
             if (ball2Active)
             {
@@ -396,7 +413,7 @@ int Game::run()
                         ball2->revert_position();
                     }
                     ball2->updateFireBall();
-                    ball2->next_step();
+                    ball2->next_step(dt);
                 }
             }
 
@@ -404,9 +421,10 @@ int Game::run()
             paddel->draw();
             bricksField->draw();
 
+            constexpr double powerUpFallSpeed = 120.0; // px/sec
             for (int i = (int)powerUps.size() - 1; i >= 0; i--)
             {
-                powerUps[i].pos.y += 2.0;
+                powerUps[i].pos.y += powerUpFallSpeed * dt;
                 bool hit = powerUps[i].pos.y + 7 >= paddel->rety() &&
                            powerUps[i].pos.y - 7 <= paddel->rety() + 10 &&
                            powerUps[i].pos.x + 15 >= paddel->retx() &&
@@ -458,6 +476,7 @@ int Game::run()
             {
                 blackHole->draw();
             }
+            frontend->draw_hud(score, levelNumber);
             SDL_RenderPresent(renderer);
             if (bricksField->destructibleCount() == 0)
             {
@@ -465,9 +484,9 @@ int Game::run()
                 eventManager.getState().gamePreEnd = true;
                 while (eventManager.getState().gamePreEnd)
                 {
+                    eventManager.pollEvents();
                     frontend->level_cleared(elapsed / std::max(1, score));
                     SDL_RenderPresent(renderer);
-                    SDL_Delay(8);
                     frontend->draw_background();
                 }
                 levelNumber++;
@@ -485,14 +504,15 @@ int Game::run()
                 eventManager.getState().gameWelcome = true;
                 while (eventManager.getState().gameWelcome)
                 {
+                    eventManager.pollEvents();
                     frontend->draw_background();
                     paddel->draw();
                     bricksField->draw();
                     ball->draw();
                     frontend->draw_welcome_text();
                     SDL_RenderPresent(renderer);
-                    SDL_Delay(8);
                 }
+                justResumed = true;
             }
         }
 
@@ -523,7 +543,6 @@ int Game::run()
 
 void Game::cleanup()
 {
-    eventManager.stopCapture();
     if (music)
     {
         Mix_FreeMusic(music);

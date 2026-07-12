@@ -1,12 +1,9 @@
 #include "EventManager.h"
+#include "UILayout.h"
 #include <SDL_events.h>
-#include <atomic>
-#include <condition_variable>
+#include <SDL_keyboard.h>
+#include <SDL_mouse.h>
 #include <cstring>
-#include <deque>
-#include <mutex>
-#include <optional>
-#include <thread>
 
 GameState::GameState()
     : gameStart(false), gameWelcome(false), gamePaused(false), gameOver(false), gamePreEnd(false),
@@ -22,22 +19,12 @@ void EventManager::setLogicalScale(double scaleX, double scaleY)
     scaleY_ = scaleY;
 }
 
-void EventManager::clearNameInput()
-{
-    std::lock_guard<std::mutex> lock(nameMutex_);
-    nameBuffer_.clear();
-}
+void EventManager::clearNameInput() { nameBuffer_.clear(); }
 
-std::string EventManager::getNameInputText()
-{
-    std::lock_guard<std::mutex> lock(nameMutex_);
-    return nameBuffer_;
-}
+std::string EventManager::getNameInputText() { return nameBuffer_; }
 
-void EventManager::getLogicalMousePos(int &x, int &y)
+void EventManager::toLogical(int rawX, int rawY, int &x, int &y) const
 {
-    int rawX, rawY;
-    SDL_GetMouseState(&rawX, &rawY);
     x = (int)(rawX / scaleX_);
     y = (int)(rawY / scaleY_);
 }
@@ -65,207 +52,144 @@ void popUtf8Char(std::string &s)
 }
 } // namespace
 
-void EventManager::waitForEvent()
+void EventManager::handleTextInputEvent(const SDL_Event &event)
 {
-    std::unique_lock<std::mutex> lock(mutex_);
-    condition_.wait(lock, [&] { return !queue_.empty() || getState().gameOver; });
-}
-
-std::optional<SDL_Event> EventManager::popEvent()
-{
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (queue_.empty())
-        return std::nullopt;
-    SDL_Event e = queue_.front();
-    queue_.pop_front();
-    return e;
-}
-
-bool EventManager::tryPopEvent(SDL_Event &out)
-{
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (queue_.empty())
-        return false;
-    out = queue_.front();
-    queue_.pop_front();
-    return true;
-}
-
-void EventManager::clearQueue()
-{
-    std::lock_guard<std::mutex> lock(mutex_);
-    queue_.clear();
-}
-
-void EventManager::startCaptureEvents()
-{
-    pollThread = std::jthread(&EventManager::acceptEventsWorker, this);
-    eventThread = std::jthread(&EventManager::processEventsWorker, this);
-}
-
-void EventManager::stopCapture()
-{
-    clearQueue();
-    eventThread.request_stop();
-    pollThread.request_stop();
-    eventThread.join();
-    pollThread.join();
-}
-
-void EventManager::acceptEventsWorker(std::stop_token stopToken)
-{
-    SDL_Event ev;
-    while (!stopToken.stop_requested())
+    if (!currentState.gameNameInput)
+        return;
+    if (event.type == SDL_TEXTINPUT)
     {
-        while (SDL_PollEvent(&ev))
-        {
-            if (stopToken.stop_requested())
-            {
-                condition_.notify_one();
-                return;
-            }
-            {
-                std::lock_guard<std::mutex> lock(mutex_);
-                queue_.push_back(ev);
-            }
-            condition_.notify_one();
-            if (ev.type == SDL_QUIT)
-                return;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        if (nameBuffer_.size() + strlen(event.text.text) <= 40)
+            nameBuffer_ += event.text.text;
+    }
+    else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE)
+    {
+        popUtf8Char(nameBuffer_);
     }
 }
 
-void EventManager::processEventsWorker(std::stop_token stopToken)
+void EventManager::pollEvents()
 {
-    while (!stopToken.stop_requested())
+    SDL_Event event;
+    while (SDL_PollEvent(&event))
     {
-        SDL_Event event;
-        int mouseX, mouseY;
-        if (tryPopEvent(event))
+        if (event.type == SDL_QUIT)
         {
-            if (event.type == SDL_QUIT)
+            currentState.gameMenu = false;
+            currentState.gameNameInput = false;
+            currentState.gameLeaderboard = false;
+            currentState.gameWelcome = false;
+            currentState.gamePaused = false;
+            currentState.gamePreEnd = false;
+            currentState.gameStart = false;
+            currentState.appQuit = true;
+            currentState.gameOver = true;
+            return;
+        }
+        handleTextInputEvent(event);
+    }
+
+    int rawX, rawY;
+    Uint32 buttons = SDL_GetMouseState(&rawX, &rawY);
+    bool mouseLeftDown = (buttons & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
+    bool clicked = mouseLeftDown && !mouseLeftDownPrev_;
+    mouseLeftDownPrev_ = mouseLeftDown;
+    int mx, my;
+    toLogical(rawX, rawY, mx, my);
+
+    const Uint8 *keys = SDL_GetKeyboardState(nullptr);
+    bool escDown = keys[SDL_SCANCODE_ESCAPE] != 0;
+    bool escPressed = escDown && !escDownPrev_;
+    escDownPrev_ = escDown;
+    bool returnDown = keys[SDL_SCANCODE_RETURN] != 0;
+    bool returnPressed = returnDown && !returnDownPrev_;
+    returnDownPrev_ = returnDown;
+
+    dispatch(mx, my, clicked, escPressed, returnPressed);
+}
+
+void EventManager::dispatch(int mx, int my, bool clicked, bool escPressed, bool returnPressed)
+{
+    if (currentState.gameMenu)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            if (!UILayout::PointInRect(mx, my, UILayout::MenuButtonRect(i)))
+                continue;
+            currentState.menuSelectedItem = (uint8_t)i;
+            if (!clicked)
+                continue;
+            if (i == 0)
             {
+                clearNameInput();
+                currentState.gameNameInput = true;
                 currentState.gameMenu = false;
-                currentState.gameNameInput = false;
-                currentState.gameLeaderboard = false;
-                currentState.gameWelcome = false;
-                currentState.gamePaused = false;
-                currentState.gamePreEnd = false;
-                currentState.gameStart = false;
-                currentState.appQuit = true;
+            }
+            else if (i == 1)
+            {
                 currentState.gameOver = true;
-                break;
+                currentState.gameMenu = false;
             }
-            else if (currentState.gameMenu)
+            else
             {
-                getLogicalMousePos(mouseX, mouseY);
-                if (mouseX >= 450 && mouseX <= 600 && mouseY <= 130 && mouseY >= 100)
-                {
-                    currentState.menuSelectedItem.store(0);
-                    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
-                    {
-                        clearNameInput();
-                        currentState.gameNameInput = true;
-                        currentState.gameMenu = false;
-                    }
-                }
-                else if (mouseX >= 450 && mouseX <= 600 && mouseY <= 170 && mouseY >= 140)
-                {
-                    currentState.menuSelectedItem.store(1);
-                    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
-                    {
-                        currentState.gameOver = true;
-                        currentState.gameMenu = false;
-                    }
-                }
-                else if (mouseX >= 450 && mouseX <= 600 && mouseY <= 210 && mouseY >= 180)
-                {
-                    currentState.menuSelectedItem.store(2);
-                    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
-                    {
-                        currentState.gameLeaderboard = true;
-                        currentState.gameMenu = false;
-                    }
-                }
+                currentState.gameLeaderboard = true;
+                currentState.gameMenu = false;
             }
-            else if (currentState.gameNameInput)
-            {
-                if (event.type == SDL_TEXTINPUT)
-                {
-                    std::lock_guard<std::mutex> lock(nameMutex_);
-                    if (nameBuffer_.size() + strlen(event.text.text) <= 40)
-                        nameBuffer_ += event.text.text;
-                }
-                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE)
-                {
-                    std::lock_guard<std::mutex> lock(nameMutex_);
-                    popUtf8Char(nameBuffer_);
-                }
-                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN)
-                {
-                    currentState.gameNameInput = false;
-                    currentState.gameWelcome = true;
-                }
-                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
-                {
-                    currentState.gameNameInput = false;
-                    currentState.gameMenu = true;
-                }
-            }
-            else if (currentState.gameLeaderboard)
-            {
-                if (event.type == SDL_KEYDOWN &&
-                    (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_ESCAPE))
-                {
-                    currentState.gameLeaderboard = false;
-                    currentState.gameMenu = true;
-                }
-                else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
-                {
-                    currentState.gameLeaderboard = false;
-                    currentState.gameMenu = true;
-                }
-            }
-            else if (currentState.gameWelcome)
-            {
-                if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
-                {
-                    currentState.gameStart = true;
-                    currentState.gameWelcome = false;
-                }
-            }
-            else if (currentState.gamePreEnd)
-            {
-                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN)
-                {
-                    currentState.gamePreEnd = false;
-                }
-            }
-            else if (currentState.gamePaused)
-            {
-                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
-                {
-                    currentState.gamePaused = false;
-                }
-                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN)
-                {
-                    currentState.gameStart = false;
-                    currentState.gamePaused = false;
-                    currentState.gameOver = true;
-                }
-            }
-            else if (currentState.gameStart)
-            {
-                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
-                {
-                    currentState.gamePaused = true;
-                }
-            }
-            else if (currentState.gameOver)
-            {
-                break;
-            }
+        }
+    }
+    else if (currentState.gameNameInput)
+    {
+        if (returnPressed)
+        {
+            currentState.gameNameInput = false;
+            currentState.gameWelcome = true;
+        }
+        else if (escPressed)
+        {
+            currentState.gameNameInput = false;
+            currentState.gameMenu = true;
+        }
+    }
+    else if (currentState.gameLeaderboard)
+    {
+        if (returnPressed || escPressed || clicked)
+        {
+            currentState.gameLeaderboard = false;
+            currentState.gameMenu = true;
+        }
+    }
+    else if (currentState.gameWelcome)
+    {
+        if (clicked)
+        {
+            currentState.gameStart = true;
+            currentState.gameWelcome = false;
+        }
+    }
+    else if (currentState.gamePreEnd)
+    {
+        if (returnPressed)
+        {
+            currentState.gamePreEnd = false;
+        }
+    }
+    else if (currentState.gamePaused)
+    {
+        if (escPressed)
+        {
+            currentState.gamePaused = false;
+        }
+        else if (returnPressed)
+        {
+            currentState.gameStart = false;
+            currentState.gamePaused = false;
+            currentState.gameOver = true;
+        }
+    }
+    else if (currentState.gameStart)
+    {
+        if (escPressed)
+        {
+            currentState.gamePaused = true;
         }
     }
 }
