@@ -3,6 +3,7 @@
 #include "Utils.h"
 #include <SDL.h>
 #include <SDL_rect.h>
+#include <algorithm>
 #include <cstdlib>
 
 BlockField::BlockField(SDL_Renderer *ren_)
@@ -30,12 +31,25 @@ int BlockField::destructibleCount()
 
 void BlockField::load_level(int levelNum)
 {
+    (void)levelNum;
     a.clear();
     for (int i = 0; i < 26; i++)
         for (int j = 0; j < 16; j++)
             map[i][j] = 0;
 
-    switch (levelNum % 6)
+    if (bagIndex >= levelBag.size())
+    {
+        int prevLast = levelBag.empty() ? -1 : levelBag.back();
+        levelBag = {0, 1, 2, 3, 4, 5};
+        do
+        {
+            std::shuffle(levelBag.begin(), levelBag.end(), rng);
+        } while (levelBag.front() == prevLast);
+        bagIndex = 0;
+    }
+    int pattern = levelBag[bagIndex++];
+
+    switch (pattern)
     {
     case 0: // Stripes
         for (int j = 0; j < 16; j++)

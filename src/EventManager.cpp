@@ -2,6 +2,7 @@
 #include <SDL_events.h>
 #include <atomic>
 #include <condition_variable>
+#include <cstring>
 #include <deque>
 #include <mutex>
 #include <optional>
@@ -9,19 +10,60 @@
 
 GameState::GameState()
     : gameStart(false), gameWelcome(false), gamePaused(false), gameOver(false), gamePreEnd(false),
-      gameMenu(true), menuSelectedItem(0)
+      gameMenu(true), gameNameInput(false), gameLeaderboard(false), appQuit(false), menuSelectedItem(0)
 {
 }
 
 GameState &EventManager::getState() { return currentState; }
+
+void EventManager::setLogicalScale(double scaleX, double scaleY)
+{
+    scaleX_ = scaleX;
+    scaleY_ = scaleY;
+}
+
+void EventManager::clearNameInput()
+{
+    std::lock_guard<std::mutex> lock(nameMutex_);
+    nameBuffer_.clear();
+}
+
+std::string EventManager::getNameInputText()
+{
+    std::lock_guard<std::mutex> lock(nameMutex_);
+    return nameBuffer_;
+}
+
+void EventManager::getLogicalMousePos(int &x, int &y)
+{
+    int rawX, rawY;
+    SDL_GetMouseState(&rawX, &rawY);
+    x = (int)(rawX / scaleX_);
+    y = (int)(rawY / scaleY_);
+}
 
 void EventManager::gameStateReset()
 {
     currentState.gameStart = false;
     currentState.gamePaused = false;
     currentState.gameOver = false;
+    currentState.gameNameInput = false;
+    currentState.gameLeaderboard = false;
     currentState.gameMenu = true;
 }
+
+namespace
+{
+void popUtf8Char(std::string &s)
+{
+    if (s.empty())
+        return;
+    size_t i = s.size() - 1;
+    while (i > 0 && (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80)
+        --i;
+    s.erase(i);
+}
+} // namespace
 
 void EventManager::waitForEvent()
 {
@@ -77,7 +119,7 @@ void EventManager::acceptEventsWorker(std::stop_token stopToken)
     {
         while (SDL_PollEvent(&ev))
         {
-            if (stopToken.stop_requested() || ev.type == SDL_QUIT)
+            if (stopToken.stop_requested())
             {
                 condition_.notify_one();
                 return;
@@ -87,6 +129,8 @@ void EventManager::acceptEventsWorker(std::stop_token stopToken)
                 queue_.push_back(ev);
             }
             condition_.notify_one();
+            if (ev.type == SDL_QUIT)
+                return;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -100,15 +144,29 @@ void EventManager::processEventsWorker(std::stop_token stopToken)
         int mouseX, mouseY;
         if (tryPopEvent(event))
         {
-            if (currentState.gameMenu)
+            if (event.type == SDL_QUIT)
             {
-                SDL_GetMouseState(&mouseX, &mouseY);
+                currentState.gameMenu = false;
+                currentState.gameNameInput = false;
+                currentState.gameLeaderboard = false;
+                currentState.gameWelcome = false;
+                currentState.gamePaused = false;
+                currentState.gamePreEnd = false;
+                currentState.gameStart = false;
+                currentState.appQuit = true;
+                currentState.gameOver = true;
+                break;
+            }
+            else if (currentState.gameMenu)
+            {
+                getLogicalMousePos(mouseX, mouseY);
                 if (mouseX >= 450 && mouseX <= 600 && mouseY <= 130 && mouseY >= 100)
                 {
                     currentState.menuSelectedItem.store(0);
                     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
                     {
-                        currentState.gameWelcome = true;
+                        clearNameInput();
+                        currentState.gameNameInput = true;
                         currentState.gameMenu = false;
                     }
                 }
@@ -121,11 +179,52 @@ void EventManager::processEventsWorker(std::stop_token stopToken)
                         currentState.gameMenu = false;
                     }
                 }
-                else if (event.type == SDL_QUIT)
+                else if (mouseX >= 450 && mouseX <= 600 && mouseY <= 210 && mouseY >= 180)
                 {
-                    currentState.menuSelectedItem.store(0);
-                    currentState.gameOver = true;
-                    currentState.gameMenu = false;
+                    currentState.menuSelectedItem.store(2);
+                    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
+                    {
+                        currentState.gameLeaderboard = true;
+                        currentState.gameMenu = false;
+                    }
+                }
+            }
+            else if (currentState.gameNameInput)
+            {
+                if (event.type == SDL_TEXTINPUT)
+                {
+                    std::lock_guard<std::mutex> lock(nameMutex_);
+                    if (nameBuffer_.size() + strlen(event.text.text) <= 40)
+                        nameBuffer_ += event.text.text;
+                }
+                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE)
+                {
+                    std::lock_guard<std::mutex> lock(nameMutex_);
+                    popUtf8Char(nameBuffer_);
+                }
+                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN)
+                {
+                    currentState.gameNameInput = false;
+                    currentState.gameWelcome = true;
+                }
+                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
+                {
+                    currentState.gameNameInput = false;
+                    currentState.gameMenu = true;
+                }
+            }
+            else if (currentState.gameLeaderboard)
+            {
+                if (event.type == SDL_KEYDOWN &&
+                    (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_ESCAPE))
+                {
+                    currentState.gameLeaderboard = false;
+                    currentState.gameMenu = true;
+                }
+                else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
+                {
+                    currentState.gameLeaderboard = false;
+                    currentState.gameMenu = true;
                 }
             }
             else if (currentState.gameWelcome)
@@ -133,11 +232,6 @@ void EventManager::processEventsWorker(std::stop_token stopToken)
                 if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
                 {
                     currentState.gameStart = true;
-                    currentState.gameWelcome = false;
-                }
-                else if (event.type == SDL_QUIT)
-                {
-                    currentState.gameOver = true;
                     currentState.gameWelcome = false;
                 }
             }

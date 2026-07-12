@@ -4,6 +4,7 @@
 #include "Utils.h"
 #include <SDL_render.h>
 #include <cstdint>
+#include <random>
 #include <vector>
 
 enum class HitSide : uint8_t
@@ -35,6 +36,9 @@ class BlockField
     SingleBlock temp;
     int map[26][16];
     SDL_Renderer *render;
+    std::vector<int> levelBag;
+    size_t bagIndex{0};
+    std::mt19937 rng{std::random_device{}()};
 
   public:
     BlockField(SDL_Renderer *ren_);

@@ -35,7 +35,8 @@ add_executable(Arkanoid
     src/EventManager.cpp
     src/Ball.cpp
     src/Game.cpp
-    src/BlackHole.cpp)
+    src/BlackHole.cpp
+    src/PlayerDatabase.cpp)
 
 # Link SDL2 library
 target_link_libraries(Arkanoid SDL2::TTF SDL2::Mixer SDL2::Main SDL2::Image)

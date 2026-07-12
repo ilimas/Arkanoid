@@ -19,7 +19,8 @@
 #include <vector>
 
 Game::Game()
-    : bounds{0, 0, 900, 620}, frontend(nullptr), renderer(nullptr), window(nullptr), music(nullptr)
+    : playerDb(SNACKS_DIR "/players.txt"), bounds{0, 0, 900, 620}, frontend(nullptr), renderer(nullptr),
+      window(nullptr), music(nullptr)
 {
 }
 
@@ -31,7 +32,18 @@ int Game::run()
         std::cerr << "SDL_Init Error: " << SDL_GetError() << "\n";
         return 1;
     }
-    window = SDL_CreateWindow("Shalnoi (refactor)", 20, 100, bounds.w, bounds.h, SDL_WINDOW_SHOWN);
+    double windowScale = 2.0;
+    SDL_Rect displayBounds;
+    if (SDL_GetDisplayUsableBounds(0, &displayBounds) == 0)
+    {
+        double maxScaleW = (displayBounds.w * 0.9) / bounds.w;
+        double maxScaleH = (displayBounds.h * 0.9) / bounds.h;
+        windowScale = std::clamp(std::min(maxScaleW, maxScaleH), 1.0, 3.0);
+    }
+    int windowW = (int)(bounds.w * windowScale);
+    int windowH = (int)(bounds.h * windowScale);
+    window = SDL_CreateWindow("Shalnoi (refactor)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowW,
+                               windowH, SDL_WINDOW_SHOWN);
     if (!window)
     {
         std::cerr << "CreateWindow: " << SDL_GetError() << "\n";
@@ -43,6 +55,8 @@ int Game::run()
         std::cerr << "CreateRenderer: " << SDL_GetError() << "\n";
         return 1;
     }
+    SDL_RenderSetLogicalSize(renderer, bounds.w, bounds.h);
+    eventManager.setLogicalScale((double)windowW / bounds.w, (double)windowH / bounds.h);
     if (Mix_OpenAudio(22050, MIX_DEFAULT_FORMAT, 2, 4096) == -1)
     {
         std::cerr << "Mix_OpenAudio failed\n";
@@ -72,6 +86,8 @@ int Game::run()
     int levelNumber = 0;
     int mx = 0, my = 0;
     int score = 0;
+    std::string currentPlayerName;
+    long long totalBlocksThisRun = 0;
     uint32_t tstart = SDL_GetTicks();
     SDL_ShowCursor(SDL_ENABLE);
     eventManager.startCaptureEvents();
@@ -84,6 +100,42 @@ int Game::run()
         }
         if (eventManager.getState().gameOver)
             break;
+
+        if (eventManager.getState().gameLeaderboard)
+        {
+            while (eventManager.getState().gameLeaderboard)
+            {
+                frontend->draw_background();
+                frontend->draw_leaderboard(playerDb.getSorted());
+                SDL_RenderPresent(renderer);
+                SDL_Delay(8);
+            }
+            if (eventManager.getState().gameOver)
+                break;
+            continue;
+        }
+
+        if (eventManager.getState().gameNameInput)
+        {
+            SDL_StartTextInput();
+            while (eventManager.getState().gameNameInput)
+            {
+                frontend->draw_background();
+                frontend->draw_name_input(eventManager.getNameInputText());
+                SDL_RenderPresent(renderer);
+                SDL_Delay(8);
+            }
+            SDL_StopTextInput();
+            if (eventManager.getState().gameOver)
+                break;
+            if (eventManager.getState().gameMenu)
+                continue;
+            currentPlayerName = eventManager.getNameInputText();
+            if (currentPlayerName.empty())
+                currentPlayerName = "Игрок";
+            totalBlocksThisRun = 0;
+        }
+
         eventManager.startCaptureEvents();
         eventManager.getState().gameStart = false;
         eventManager.getState().gamePaused = false;
@@ -122,7 +174,10 @@ int Game::run()
             }
             if (eventManager.getState().gameOver == true)
                 break;
-            SDL_GetMouseState(&mx, nullptr);
+            SDL_GetMouseState(&mx, &my);
+            float logicalMx, logicalMy;
+            SDL_RenderWindowToLogical(renderer, mx, my, &logicalMx, &logicalMy);
+            mx = (int)logicalMx;
             if (mx >= 50 && mx <= 830)
             {
                 paddel->setpos(mx - 50);
@@ -188,6 +243,7 @@ int Game::run()
                                         current_block.r.y + current_block.r.h / 2.0};
                                 bricksField->del(i);
                                 score++;
+                                totalBlocksThisRun++;
                                 i--;
                                 if (std::rand() % 100 < 7)
                                     powerUps.push_back({bc, std::rand() % 2 == 0});
@@ -310,6 +366,7 @@ int Game::run()
                                         Vec2 bc{cb.r.x + cb.r.w / 2.0, cb.r.y + cb.r.h / 2.0};
                                         bricksField->del(i);
                                         score++;
+                                        totalBlocksThisRun++;
                                         i--;
                                         if (std::rand() % 100 < 7)
                                             powerUps.push_back({bc, std::rand() % 2 == 0});
@@ -440,6 +497,14 @@ int Game::run()
 
         // reset after game over to menu
         SDL_ShowCursor(SDL_ENABLE);
+        if (!currentPlayerName.empty())
+        {
+            playerDb.addBlocks(currentPlayerName, totalBlocksThisRun);
+            currentPlayerName.clear();
+        }
+        totalBlocksThisRun = 0;
+        if (eventManager.getState().appQuit)
+            break;
         eventManager.gameStateReset();
         score = 0;
         levelNumber = 0;

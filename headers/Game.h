@@ -7,6 +7,7 @@
 #include "EventManager.h"
 #include "FrontendManager.h"
 #include "Paddel.h"
+#include "PlayerDatabase.h"
 #include <SDL_mixer.h>
 #include <SDL_rect.h>
 #include <SDL_render.h>
@@ -27,6 +28,7 @@ class Game
     std::unique_ptr<Ball> ball;
     std::unique_ptr<BlackHole> blackHole;
     EventManager eventManager;
+    PlayerDatabase playerDb;
     SDL_Rect bounds;
     SDL_Window *window;
     SDL_Renderer *renderer;

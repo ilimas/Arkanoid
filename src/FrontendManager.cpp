@@ -35,6 +35,20 @@ FrontendManager::~FrontendManager()
     SDL_DestroyTexture(tbackground);
 }
 
+void FrontendManager::draw_text(const std::string &utf8, int x, int y, SDL_Color color, int fontSize)
+{
+    TTF_SetFontSize(fnt, fontSize);
+    SDL_Surface *surf = TTF_RenderUTF8_Blended(fnt, utf8.c_str(), color);
+    if (!surf)
+        return;
+    SDL_Texture *tex = SDL_CreateTextureFromSurface(render, surf);
+    SDL_Rect r{x, y, surf->w, surf->h};
+    SDL_RenderCopy(render, tex, NULL, &r);
+    SDL_FreeSurface(surf);
+    SDL_DestroyTexture(tex);
+    TTF_SetFontSize(fnt, 30);
+}
+
 void FrontendManager::draw_welcome_text()
 {
     SDL_Rect r;
@@ -133,56 +147,43 @@ void FrontendManager::draw_end()
 
 void FrontendManager::draw_menu(int menu)
 {
-    SDL_Rect r;
-    SDL_Color color;
     SDL_RenderCopy(render, tmenu, NULL, NULL);
-    if (menu == 0)
+    static const char *labels[3] = {"Новая Игра", "Выход", "Таблица игроков"};
+    static const int ys[3] = {100, 140, 180};
+    SDL_Color selectedColor{255, 185, 15, 255};
+    SDL_Color normalColor{255, 52, 179, 255};
+    for (int i = 0; i < 3; i++)
+        draw_text(labels[i], 450, ys[i], (i == menu) ? selectedColor : normalColor, 30);
+}
+
+void FrontendManager::draw_name_input(const std::string &currentName)
+{
+    SDL_Color prompt{255, 185, 15, 255};
+    draw_text("Введите имя игрока:", 200, 200, prompt, 24);
+    std::string display = currentName + "_";
+    draw_text(display, 200, 250, prompt, 30);
+    SDL_Color hint{255, 52, 179, 255};
+    draw_text("Enter - начать игру, Esc - в меню", 200, 320, hint, 18);
+}
+
+void FrontendManager::draw_leaderboard(const std::vector<PlayerDatabase::Entry> &entries)
+{
+    SDL_Color title{255, 185, 15, 255};
+    draw_text("Таблица игроков (всего сбито блоков)", 90, 50, title, 24);
+    SDL_Color row{255, 255, 255, 255};
+    int y = 110;
+    int rank = 1;
+    for (const auto &e : entries)
     {
-        color.r = 255;
-        color.g = 185;
-        color.b = 15;
-        text = TTF_RenderUTF8_Blended(fnt, "Новая Игра", color);
-        ftext = SDL_CreateTextureFromSurface(render, text);
-        r.x = 450;
-        r.y = 100;
-        r.h = text->h;
-        r.w = text->w;
-        SDL_RenderCopy(render, ftext, NULL, &r);
-        color.r = 255;
-        color.g = 52;
-        color.b = 179;
-        text = TTF_RenderUTF8_Blended(fnt, "Выход", color);
-        ftext = SDL_CreateTextureFromSurface(render, text);
-        r.x = 450;
-        r.y = 140;
-        r.h = text->h;
-        r.w = text->w;
-        SDL_RenderCopy(render, ftext, NULL, &r);
-        SDL_FreeSurface(text);
+        if (rank > 10)
+            break;
+        std::string line = std::to_string(rank) + ". " + e.name + " - " + std::to_string(e.totalBlocks);
+        draw_text(line, 120, y, row, 20);
+        y += 30;
+        rank++;
     }
-    else if (menu == 1)
-    {
-        color.r = 255;
-        color.g = 52;
-        color.b = 179;
-        text = TTF_RenderUTF8_Blended(fnt, "Новая Игра", color);
-        ftext = SDL_CreateTextureFromSurface(render, text);
-        r.x = 450;
-        r.y = 100;
-        r.h = text->h;
-        r.w = text->w;
-        SDL_RenderCopy(render, ftext, NULL, &r);
-        color.r = 255;
-        color.g = 185;
-        color.b = 15;
-        text = TTF_RenderUTF8_Blended(fnt, "Выход", color);
-        ftext = SDL_CreateTextureFromSurface(render, text);
-        r.x = 450;
-        r.y = 140;
-        r.h = text->h;
-        r.w = text->w;
-        SDL_RenderCopy(render, ftext, NULL, &r);
-        SDL_FreeSurface(text);
-    }
-    SDL_DestroyTexture(ftext);
+    if (entries.empty())
+        draw_text("Пока нет результатов", 120, y, row, 20);
+    SDL_Color hint{255, 52, 179, 255};
+    draw_text("Enter / Esc / клик - назад в меню", 120, 560, hint, 18);
 }
