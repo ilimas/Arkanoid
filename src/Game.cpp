@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <memory>
 #include <numbers>
+#include <utility>
 #include <vector>
 
 Game::Game()
@@ -204,15 +205,26 @@ int Game::run()
             frontend->draw_background();
             if (ball->get_position().y >= (float)(bounds.h - 10))
             {
-                eventManager.getState().gamePreEnd = true;
-                while (eventManager.getState().gamePreEnd)
+                if (ball2Active)
                 {
-                    eventManager.pollEvents();
-                    frontend->draw_end();
-                    SDL_RenderPresent(renderer);
-                    frontend->draw_background();
-                };
-                break;
+                    // The main ball dropped but the duplicate is still in play:
+                    // promote it to be the main ball instead of ending the game.
+                    std::swap(ball, ball2);
+                    ball2Active = false;
+                    ballStuckInHole = false;
+                }
+                else
+                {
+                    eventManager.getState().gamePreEnd = true;
+                    while (eventManager.getState().gamePreEnd)
+                    {
+                        eventManager.pollEvents();
+                        frontend->draw_end();
+                        SDL_RenderPresent(renderer);
+                        frontend->draw_background();
+                    };
+                    break;
+                }
             }
             else if (!ball->out_of_bounds() && !ballStuckInHole)
             {
