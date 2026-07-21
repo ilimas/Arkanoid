@@ -22,6 +22,7 @@ class Ball
     uint32_t fireBallEnd{0};
     SDL_Texture *texNormal{nullptr};
     SDL_Texture *texFire{nullptr};
+    double speedElapsed{0.0}; // seconds of active play since last setmain()/sync, drives the speed ramp
 
   public:
     int radius;
@@ -47,6 +48,8 @@ class Ball
     int retfx();
     double retalf();
     void next_step(double dt);
+    double getSpeedElapsed() const { return speedElapsed; }
+    void setSpeedElapsed(double t) { speedElapsed = t; }
     bool isFireBall() const { return fireBallActive; }
     void activateFireBall(uint32_t durationMs);
     void updateFireBall();

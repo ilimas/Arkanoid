@@ -129,6 +129,7 @@ void Ball::setmain()
     alf = std::numbers::pi / 2;
     fx = 0;
     fireBallActive = false;
+    speedElapsed = 0.0;
 }
 
 void Ball::activateFireBall(uint32_t durationMs)
@@ -148,6 +149,12 @@ void Ball::next_step(double dt)
     // destination's magnitude is the "canonical speed" set on paddle bounce (see
     // Game.cpp), so this is a plain px/sec speed scale, not a per-frame step -
     // the ball now covers the same distance per second regardless of frame rate.
-    constexpr double speedPxPerSec = 360.0;
+    // Speed ramps up gradually the longer the ball stays in play (reset on
+    // setmain(), i.e. each new level/life), capped so it never gets unfair.
+    constexpr double baseSpeedPxPerSec = 360.0;
+    constexpr double maxSpeedPxPerSec = 620.0;
+    constexpr double speedRampPxPerSec2 = 4.5; // px/sec gained per second of play
+    speedElapsed += dt;
+    double speedPxPerSec = std::min(maxSpeedPxPerSec, baseSpeedPxPerSec + speedRampPxPerSec2 * speedElapsed);
     position += destination * (speedPxPerSec * dt);
 }

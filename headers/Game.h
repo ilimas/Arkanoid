@@ -21,6 +21,7 @@ class Game
 
   private:
     void cleanup();
+    void limitFrameRate();
 
     std::unique_ptr<FrontendManager> frontend;
     std::unique_ptr<Paddel> paddel;
@@ -33,6 +34,8 @@ class Game
     SDL_Window *window;
     SDL_Renderer *renderer;
     Mix_Music *music;
+    Uint64 frameFreq{0};
+    Uint64 lastFrameCounter{0};
 };
 
 #endif

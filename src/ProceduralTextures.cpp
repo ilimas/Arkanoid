@@ -11,6 +11,19 @@ SDL_Color shade(SDL_Color base, float factor)
     return SDL_Color{clamp8(base.r * factor), clamp8(base.g * factor), clamp8(base.b * factor), base.a};
 }
 
+SDL_Color lerpColor(SDL_Color a, SDL_Color b, float t)
+{
+    t = std::clamp(t, 0.0f, 1.0f);
+    return SDL_Color{clamp8(a.r + (b.r - a.r) * t), clamp8(a.g + (b.g - a.g) * t), clamp8(a.b + (b.b - a.b) * t),
+                      clamp8(a.a + (b.a - a.a) * t)};
+}
+
+float smoothstep(float edge0, float edge1, float x)
+{
+    float t = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
 SDL_Surface *newSurface(int w, int h) { return SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_RGBA32); }
 
 SDL_Texture *finish(SDL_Renderer *ren, SDL_Surface *surf)
@@ -199,6 +212,90 @@ SDL_Texture *makeCometTexture(SDL_Renderer *ren, int length, int thickness, SDL_
             Uint8 g = clamp8(color.g + whiten * (255 - color.g));
             Uint8 b = clamp8(color.b + whiten * (255 - color.b));
             px[y * length + x] = SDL_MapRGBA(fmt, r, g, b, clamp8(alpha));
+        }
+    }
+    return finish(ren, surf);
+}
+
+SDL_Texture *makeBlackHoleCoreTexture(SDL_Renderer *ren, int diameter)
+{
+    SDL_Surface *surf = newSurface(diameter, diameter);
+    Uint32 *px = static_cast<Uint32 *>(surf->pixels);
+    const SDL_PixelFormat *fmt = surf->format;
+    float r = diameter / 2.0f;
+    float cx = r, cy = r;
+    float coreR = r * 0.55f;
+    float ringR = r * 0.72f;
+    SDL_Color ringHot{255, 205, 150, 255};
+
+    for (int y = 0; y < diameter; y++)
+    {
+        for (int x = 0; x < diameter; x++)
+        {
+            float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+            float dist = std::sqrt(dx * dx + dy * dy);
+
+            if (dist <= coreR)
+            {
+                // Near-black event horizon with a faint inward vignette for depth.
+                float f = 1.0f - 0.15f * (dist / coreR);
+                SDL_Color c = shade(SDL_Color{6, 3, 12, 255}, f);
+                px[y * diameter + x] = SDL_MapRGBA(fmt, c.r, c.g, c.b, 255);
+            }
+            else if (dist <= ringR)
+            {
+                // Bright photon ring right at the horizon's edge, fading out both
+                // toward the black core and toward the surrounding disk.
+                float t = (dist - coreR) / (ringR - coreR);
+                float glow = std::sin(t * (float)M_PI); // 0 at both ends, peak at t=0.5
+                SDL_Color c = ringHot;
+                Uint8 a = clamp8(glow * 255.0f);
+                px[y * diameter + x] = SDL_MapRGBA(fmt, c.r, c.g, c.b, a);
+            }
+            else
+            {
+                px[y * diameter + x] = 0;
+            }
+        }
+    }
+    return finish(ren, surf);
+}
+
+SDL_Texture *makeBlackHoleDiskTexture(SDL_Renderer *ren, int diameter)
+{
+    SDL_Surface *surf = newSurface(diameter, diameter);
+    Uint32 *px = static_cast<Uint32 *>(surf->pixels);
+    const SDL_PixelFormat *fmt = surf->format;
+    float r = diameter / 2.0f;
+    float cx = r, cy = r;
+    float rInner = r * 0.60f;
+    float rOuter = r * 0.99f;
+    constexpr float arms = 5.0f;
+    constexpr float twist = 5.0f;
+    SDL_Color hot{255, 150, 70, 255};
+    SDL_Color cool{130, 70, 230, 255};
+
+    for (int y = 0; y < diameter; y++)
+    {
+        for (int x = 0; x < diameter; x++)
+        {
+            float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+            float dist = std::sqrt(dx * dx + dy * dy);
+            if (dist < rInner - 2.0f || dist > rOuter)
+            {
+                px[y * diameter + x] = 0;
+                continue;
+            }
+
+            float t = std::clamp((dist - rInner) / (rOuter - rInner), 0.0f, 1.0f);
+            float angle = std::atan2(dy, dx);
+            float spiral = 0.5f + 0.5f * std::sin(angle * arms - t * twist * 2.0f * (float)M_PI);
+            float edgeFalloff = smoothstep(rInner - 2.0f, rInner + 2.0f, dist) * (1.0f - smoothstep(rOuter - 5.0f, rOuter, dist));
+            float brightness = spiral * (1.0f - t * 0.55f);
+
+            SDL_Color c = lerpColor(hot, cool, t);
+            Uint8 a = clamp8(brightness * edgeFalloff * 235.0f);
+            px[y * diameter + x] = SDL_MapRGBA(fmt, c.r, c.g, c.b, a);
         }
     }
     return finish(ren, surf);

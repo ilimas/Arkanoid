@@ -26,6 +26,17 @@ SDL_Texture *makeNebulaTexture(SDL_Renderer *ren, int w, int h);
 // whitened glowing head on the right. Rotate with SDL_RenderCopyEx (pivot at
 // the right edge) to point the head along a comet's direction of travel.
 SDL_Texture *makeCometTexture(SDL_Renderer *ren, int length, int thickness, SDL_Color color);
+
+// Solid event-horizon core: a black disc with a warm photon-ring glow right at
+// its edge, fully transparent beyond that - meant to be drawn static on top of
+// the (rotating) accretion disk texture.
+SDL_Texture *makeBlackHoleCoreTexture(SDL_Renderer *ren, int diameter);
+
+// Swirling accretion-disk ring: spiral arms blending hot orange near the inner
+// edge into cool purple/blue near the outer edge, transparent at the center
+// and past the outer edge. Rotate continuously with SDL_RenderCopyEx around
+// its center for an animated swirl, without needing a loaded GIF.
+SDL_Texture *makeBlackHoleDiskTexture(SDL_Renderer *ren, int diameter);
 } // namespace ProceduralTextures
 
 #endif

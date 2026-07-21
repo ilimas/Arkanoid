@@ -51,13 +51,18 @@ int Game::run()
         std::cerr << "CreateWindow: " << SDL_GetError() << "\n";
         return 1;
     }
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    // VSync is left off and replaced with an explicit 120 FPS cap (limitFrameRate())
+    // so the frame rate is a fixed target regardless of the display's actual
+    // refresh rate, instead of whatever the compositor happens to hand back.
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (!renderer)
     {
         std::cerr << "CreateRenderer: " << SDL_GetError() << "\n";
         return 1;
     }
     SDL_RenderSetLogicalSize(renderer, bounds.w, bounds.h);
+    frameFreq = SDL_GetPerformanceFrequency();
+    lastFrameCounter = SDL_GetPerformanceCounter();
     eventManager.setLogicalScale((double)windowW / bounds.w, (double)windowH / bounds.h);
     if (Mix_OpenAudio(22050, MIX_DEFAULT_FORMAT, 2, 4096) == -1)
     {
@@ -96,7 +101,7 @@ int Game::run()
             eventManager.pollEvents();
             frontend->draw_menu(eventManager.getState().menuSelectedItem);
             SDL_RenderPresent(renderer);
-            SDL_Delay(1);
+            limitFrameRate();
         }
         if (eventManager.getState().gameOver)
             break;
@@ -109,6 +114,7 @@ int Game::run()
                 frontend->draw_background();
                 frontend->draw_leaderboard(playerDb.getSorted());
                 SDL_RenderPresent(renderer);
+                limitFrameRate();
             }
             if (eventManager.getState().gameOver)
                 break;
@@ -124,6 +130,7 @@ int Game::run()
                 frontend->draw_background();
                 frontend->draw_name_input(eventManager.getNameInputText());
                 SDL_RenderPresent(renderer);
+                limitFrameRate();
             }
             SDL_StopTextInput();
             if (eventManager.getState().gameOver)
@@ -159,6 +166,7 @@ int Game::run()
             ball->draw();
             frontend->draw_welcome_text();
             SDL_RenderPresent(renderer);
+            limitFrameRate();
         }
 
         SDL_ShowCursor(SDL_DISABLE);
@@ -173,6 +181,7 @@ int Game::run()
                 frontend->draw_background();
                 frontend->draw_pause();
                 SDL_RenderPresent(renderer);
+                limitFrameRate();
             }
             if (wasPaused)
                 justResumed = true;
@@ -221,6 +230,7 @@ int Game::run()
                         eventManager.pollEvents();
                         frontend->draw_end();
                         SDL_RenderPresent(renderer);
+                        limitFrameRate();
                         frontend->draw_background();
                     };
                     break;
@@ -452,6 +462,7 @@ int Game::run()
                             Vec2 d = ball->get_destination();
                             ball2->set_destination({-d.x, d.y});
                             ball2->radius = 10;
+                            ball2->setSpeedElapsed(ball->getSpeedElapsed());
                             if (ball->isFireBall())
                                 ball2->activateFireBall(4000);
                         }
@@ -490,6 +501,7 @@ int Game::run()
             }
             frontend->draw_hud(score, levelNumber);
             SDL_RenderPresent(renderer);
+            limitFrameRate();
             if (bricksField->destructibleCount() == 0)
             {
                 float elapsed = (SDL_GetTicks() - tstart) / 1000.0f;
@@ -499,6 +511,7 @@ int Game::run()
                     eventManager.pollEvents();
                     frontend->level_cleared(elapsed / std::max(1, score));
                     SDL_RenderPresent(renderer);
+                    limitFrameRate();
                     frontend->draw_background();
                 }
                 levelNumber++;
@@ -523,6 +536,7 @@ int Game::run()
                     ball->draw();
                     frontend->draw_welcome_text();
                     SDL_RenderPresent(renderer);
+                    limitFrameRate();
                 }
                 justResumed = true;
             }
@@ -551,6 +565,16 @@ int Game::run()
     }
     cleanup();
     return 0;
+}
+
+void Game::limitFrameRate()
+{
+    constexpr double targetFrameSeconds = 1.0 / 120.0;
+    Uint64 now = SDL_GetPerformanceCounter();
+    double elapsed = (double)(now - lastFrameCounter) / (double)frameFreq;
+    if (elapsed < targetFrameSeconds)
+        SDL_Delay((Uint32)((targetFrameSeconds - elapsed) * 1000.0));
+    lastFrameCounter = SDL_GetPerformanceCounter();
 }
 
 void Game::cleanup()
