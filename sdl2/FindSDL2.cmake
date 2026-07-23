@@ -315,9 +315,21 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(SDL2
                                   VERSION_VAR SDL2_VERSION_STRING)
 
 if(SDL2MAIN_LIBRARY)
-  FIND_PACKAGE_HANDLE_STANDARD_ARGS(SDL2main
-                                    REQUIRED_VARS SDL2MAIN_LIBRARY SDL2_INCLUDE_DIR
-                                    VERSION_VAR SDL2_VERSION_STRING)
+  # NAME_MISMATCHED tells FPHSA this is deliberate: this module is invoked
+  # under the name of whatever package asked for it (SDL2, SDL2_ttf, SDL2_mixer,
+  # SDL2_image all call find_package(SDL2) internally), but this specific check
+  # is reporting on the separate SDL2main component - without it, CMake prints
+  # a "package name passed does not match" developer warning on every configure.
+  if(CMAKE_VERSION VERSION_LESS "3.17")
+    FIND_PACKAGE_HANDLE_STANDARD_ARGS(SDL2main
+                                      REQUIRED_VARS SDL2MAIN_LIBRARY SDL2_INCLUDE_DIR
+                                      VERSION_VAR SDL2_VERSION_STRING)
+  else()
+    FIND_PACKAGE_HANDLE_STANDARD_ARGS(SDL2main
+                                      REQUIRED_VARS SDL2MAIN_LIBRARY SDL2_INCLUDE_DIR
+                                      VERSION_VAR SDL2_VERSION_STRING
+                                      NAME_MISMATCHED)
+  endif()
 endif()
 
 

@@ -4,7 +4,6 @@
 #include "Bricks.h"
 #include "EventManager.h"
 #include "FrontendManager.h"
-#include "GLInterop.h"
 #include "Paddel.h"
 #include "ResolutionPresets.h"
 #include <SDL_mixer.h>
@@ -13,7 +12,6 @@
 #include <SDL_timer.h>
 #include <cstdint>
 #include <cstdlib>
-#include <cstring>
 #include <ctime>
 #include <iostream>
 #include <algorithm>
@@ -54,30 +52,27 @@ int Game::run()
         std::cerr << "CreateWindow: " << SDL_GetError() << "\n";
         return 1;
     }
-    // VSync is left off and replaced with an explicit 120 FPS cap (limitFrameRate())
-    // so the frame rate is a fixed target regardless of the display's actual
-    // refresh rate, instead of whatever the compositor happens to hand back.
-    // The opengl driver is requested explicitly (rather than -1/"best available")
-    // so GLInterop can reliably borrow the same GL context for its shader passes;
-    // if this specific driver isn't available on the host, fall back to -1 and
-    // every shader effect below will just no-op back to its CPU-baked texture.
-    int glDriverIndex = -1;
-    for (int i = 0; i < SDL_GetNumRenderDrivers(); i++)
-    {
-        SDL_RendererInfo info;
-        if (SDL_GetRenderDriverInfo(i, &info) == 0 && std::strcmp(info.name, "opengl") == 0)
-        {
-            glDriverIndex = i;
-            break;
-        }
-    }
-    renderer = SDL_CreateRenderer(window, glDriverIndex, SDL_RENDERER_ACCELERATED);
+    // VSync is back on: presenting untimed (just SDL_Delay-paced to ~120fps)
+    // caused visible tearing and uneven/jerky motion, since SDL_Delay's timer
+    // resolution isn't precise enough to pace frames smoothly on its own and
+    // nothing was blocking presentation to the display's actual refresh.
+    // limitFrameRate() stays as a backstop cap (harmless with vsync on, since
+    // SDL_RenderPresent already blocks for a whole vblank - it only matters if
+    // vsync isn't actually honored on a given system/driver).
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer)
     {
         std::cerr << "CreateRenderer: " << SDL_GetError() << "\n";
         return 1;
     }
-    GLInterop::init(renderer);
+    // GLInterop::init(renderer) is deliberately NOT called: interleaving raw GL
+    // draws (for the shader-based background/black-hole/ball-glow effects)
+    // with SDL_render corrupted SDL's own GL state cache in practice (garbled
+    // HUD text, a solid black square instead of the ball, a flat background
+    // with no nebula/stars) - every effect's GLInterop::available() check
+    // means they all cleanly fall back to their CPU-baked textures as long as
+    // this stays uninitialized. See GLInterop.h/.cpp and Starfield/BlackHole/
+    // Ball's shader paths for the (currently unused) real-time-shader code.
     SDL_RenderSetLogicalSize(renderer, bounds.w, bounds.h);
     frameFreq = SDL_GetPerformanceFrequency();
     lastFrameCounter = SDL_GetPerformanceCounter();
