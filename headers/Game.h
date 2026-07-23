@@ -22,6 +22,7 @@ class Game
   private:
     void cleanup();
     void limitFrameRate();
+    void applyResolution(int w, int h);
 
     std::unique_ptr<FrontendManager> frontend;
     std::unique_ptr<Paddel> paddel;

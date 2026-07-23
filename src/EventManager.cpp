@@ -1,4 +1,5 @@
 #include "EventManager.h"
+#include "ResolutionPresets.h"
 #include "UILayout.h"
 #include <SDL_events.h>
 #include <SDL_keyboard.h>
@@ -7,7 +8,8 @@
 
 GameState::GameState()
     : gameStart(false), gameWelcome(false), gamePaused(false), gameOver(false), gamePreEnd(false),
-      gameMenu(true), gameNameInput(false), gameLeaderboard(false), appQuit(false), menuSelectedItem(0)
+      gameMenu(true), gameNameInput(false), gameLeaderboard(false), gameSettings(false), appQuit(false),
+      menuSelectedItem(0), settingsSelectedItem(0), pendingResolutionIndex(-1)
 {
 }
 
@@ -36,6 +38,7 @@ void EventManager::gameStateReset()
     currentState.gameOver = false;
     currentState.gameNameInput = false;
     currentState.gameLeaderboard = false;
+    currentState.gameSettings = false;
     currentState.gameMenu = true;
 }
 
@@ -111,7 +114,7 @@ void EventManager::dispatch(int mx, int my, bool clicked, bool escPressed, bool 
 {
     if (currentState.gameMenu)
     {
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 4; i++)
         {
             if (!UILayout::PointInRect(mx, my, UILayout::MenuButtonRect(i)))
                 continue;
@@ -129,9 +132,14 @@ void EventManager::dispatch(int mx, int my, bool clicked, bool escPressed, bool 
                 currentState.gameOver = true;
                 currentState.gameMenu = false;
             }
-            else
+            else if (i == 2)
             {
                 currentState.gameLeaderboard = true;
+                currentState.gameMenu = false;
+            }
+            else
+            {
+                currentState.gameSettings = true;
                 currentState.gameMenu = false;
             }
         }
@@ -154,6 +162,22 @@ void EventManager::dispatch(int mx, int my, bool clicked, bool escPressed, bool 
         if (returnPressed || escPressed || clicked)
         {
             currentState.gameLeaderboard = false;
+            currentState.gameMenu = true;
+        }
+    }
+    else if (currentState.gameSettings)
+    {
+        for (int i = 0; i < kResolutionPresetCount; i++)
+        {
+            if (!UILayout::PointInRect(mx, my, UILayout::MenuButtonRect(i)))
+                continue;
+            currentState.settingsSelectedItem = (uint8_t)i;
+            if (clicked)
+                currentState.pendingResolutionIndex = i;
+        }
+        if (returnPressed || escPressed)
+        {
+            currentState.gameSettings = false;
             currentState.gameMenu = true;
         }
     }

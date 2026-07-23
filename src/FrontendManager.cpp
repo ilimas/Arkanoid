@@ -1,4 +1,5 @@
 #include "FrontendManager.h"
+#include "ResolutionPresets.h"
 #include "UILayout.h"
 #include <SDL.h>
 #include <SDL_image.h>
@@ -32,7 +33,7 @@ FrontendManager::FrontendManager(SDL_Renderer *ren)
     {
         std::cerr << "TTF_Init error\n";
     }
-    fnt = TTF_OpenFont(SNACKS_DIR "/ttf/Casper_B.ttf", 30);
+    fnt = TTF_OpenFont(SNACKS_DIR "/ttf/Casper_B.ttf", 48);
     if (!fnt)
         throw std::runtime_error("Unable to load font");
     render = ren;
@@ -71,7 +72,7 @@ SDL_Texture *FrontendManager::get_cached_texture(TextCache &cache, const std::st
         }
         TTF_SetFontSize(fnt, fontSize);
         SDL_Surface *surf = TTF_RenderUTF8_Blended(fnt, utf8.c_str(), SDL_Color{255, 255, 255, 255});
-        TTF_SetFontSize(fnt, 30);
+        TTF_SetFontSize(fnt, 48);
         if (surf)
         {
             cache.texture = SDL_CreateTextureFromSurface(render, surf);
@@ -119,9 +120,9 @@ void FrontendManager::draw_dim_overlay(Uint8 alpha)
 
 void FrontendManager::draw_dialog(const std::vector<DialogLine> &lines)
 {
-    constexpr int lineSpacing = 14;
-    constexpr int paddingX = 50;
-    constexpr int paddingY = 36;
+    constexpr int lineSpacing = 22;
+    constexpr int paddingX = 80;
+    constexpr int paddingY = 58;
 
     int maxW = 0;
     int totalH = 0;
@@ -162,8 +163,8 @@ void FrontendManager::draw_dialog(const std::vector<DialogLine> &lines)
 
 void FrontendManager::draw_banner(const std::string &utf8, int y, int fontSize, SDL_Color color)
 {
-    constexpr int paddingX = 24;
-    constexpr int paddingY = 12;
+    constexpr int paddingX = 38;
+    constexpr int paddingY = 19;
     get_cached_texture(bannerCache, utf8, fontSize, color);
     int barW = bannerCache.size.x + paddingX * 2;
     int barH = bannerCache.size.y + paddingY * 2;
@@ -182,9 +183,9 @@ void FrontendManager::draw_banner(const std::string &utf8, int y, int fontSize, 
 void FrontendManager::draw_chip(TextCache &cache, const std::string &utf8, int x, int y, SDL_Color color,
                                  bool alignRight)
 {
-    constexpr int fontSize = 20;
-    constexpr int paddingX = 14;
-    constexpr int paddingY = 8;
+    constexpr int fontSize = 32;
+    constexpr int paddingX = 22;
+    constexpr int paddingY = 13;
     get_cached_texture(cache, utf8, fontSize, color);
     int chipW = cache.size.x + paddingX * 2;
     int chipH = cache.size.y + paddingY * 2;
@@ -201,15 +202,15 @@ void FrontendManager::draw_chip(TextCache &cache, const std::string &utf8, int x
 
 void FrontendManager::draw_welcome_text()
 {
-    draw_banner("Нажмите левую кнопку мыши, чтобы начать", 480, 22, kGold);
+    draw_banner("Нажмите левую кнопку мыши, чтобы начать", 768, 35, kGold);
 }
 
 void FrontendManager::draw_pause()
 {
     draw_dialog({
-        {"Игра на паузе", 34, kGold},
-        {"Esc - продолжить", 20, kText},
-        {"Enter - выход в меню", 20, kText},
+        {"Игра на паузе", 54, kGold},
+        {"Esc - продолжить", 32, kText},
+        {"Enter - выход в меню", 32, kText},
     });
 }
 
@@ -227,17 +228,17 @@ void FrontendManager::level_cleared(double a)
     char buf[64];
     snprintf(buf, sizeof(buf), "Ваш ранк: %.2f", a);
     draw_dialog({
-        {"Уровень пройден!", 34, kGold},
-        {buf, 20, kText},
-        {"Enter - в меню", 18, kPink},
+        {"Уровень пройден!", 54, kGold},
+        {buf, 32, kText},
+        {"Enter - в меню", 29, kPink},
     });
 }
 
 void FrontendManager::draw_end()
 {
     draw_dialog({
-        {"Игра окончена", 34, kGold},
-        {"Enter - в меню", 20, kPink},
+        {"Игра окончена", 54, kGold},
+        {"Enter - в меню", 32, kPink},
     });
 }
 
@@ -251,10 +252,10 @@ void FrontendManager::draw_menu(int menu)
     SDL_SetRenderDrawColor(render, kGold.r, kGold.g, kGold.b, kGold.a);
     SDL_RenderDrawRect(render, &panel);
 
-    draw_cached_text_centered_x(menuTitleCache, "АРКАНОИД", panel.x + panel.w / 2, UILayout::MenuTitleY, kGold, 36);
+    draw_cached_text_centered_x(menuTitleCache, "АРКАНОИД", panel.x + panel.w / 2, UILayout::MenuTitleY, kGold, 58);
 
-    static const char *labels[3] = {"Новая игра", "Выход", "Таблица игроков"};
-    for (int i = 0; i < 3; i++)
+    static const char *labels[4] = {"Новая игра", "Выход", "Таблица игроков", "Настройки"};
+    for (int i = 0; i < 4; i++)
     {
         SDL_Rect btn = UILayout::MenuButtonRect(i);
         bool selected = (i == menu);
@@ -272,29 +273,82 @@ void FrontendManager::draw_menu(int menu)
         SDL_RenderDrawRect(render, &btn);
 
         SDL_Color labelColor = selected ? SDL_Color{20, 16, 10, 255} : kPink;
-        get_cached_texture(menuButtonCache[i], labels[i], 24, labelColor);
+        get_cached_texture(menuButtonCache[i], labels[i], 38, labelColor);
         int lx = btn.x + (btn.w - menuButtonCache[i].size.x) / 2;
         int ly = btn.y + (btn.h - menuButtonCache[i].size.y) / 2;
-        draw_cached_text(menuButtonCache[i], labels[i], lx, ly, labelColor, 24);
+        draw_cached_text(menuButtonCache[i], labels[i], lx, ly, labelColor, 38);
     }
+}
+
+void FrontendManager::draw_settings(int hoverIndex, int activeResIndex)
+{
+    SDL_RenderCopy(render, tmenu, NULL, NULL);
+
+    const SDL_Rect &panel = UILayout::MenuPanel;
+    SDL_SetRenderDrawColor(render, kPanelBg.r, kPanelBg.g, kPanelBg.b, kPanelBg.a);
+    SDL_RenderFillRect(render, &panel);
+    SDL_SetRenderDrawColor(render, kGold.r, kGold.g, kGold.b, kGold.a);
+    SDL_RenderDrawRect(render, &panel);
+
+    draw_cached_text_centered_x(settingsTitleCache, "НАСТРОЙКИ", panel.x + panel.w / 2, UILayout::MenuTitleY, kGold,
+                                 58);
+
+    constexpr SDL_Color kActiveGreen{140, 255, 190, 255};
+    for (int i = 0; i < kResolutionPresetCount; i++)
+    {
+        SDL_Rect btn = UILayout::MenuButtonRect(i);
+        bool hovered = (i == hoverIndex);
+        bool active = (i == activeResIndex);
+        if (hovered)
+        {
+            SDL_SetRenderDrawColor(render, kGold.r, kGold.g, kGold.b, 235);
+            SDL_RenderFillRect(render, &btn);
+        }
+        else if (active)
+        {
+            SDL_SetRenderDrawColor(render, kActiveGreen.r, kActiveGreen.g, kActiveGreen.b, 70);
+            SDL_RenderFillRect(render, &btn);
+        }
+        else
+        {
+            SDL_SetRenderDrawColor(render, 255, 255, 255, 30);
+            SDL_RenderFillRect(render, &btn);
+        }
+        SDL_SetRenderDrawColor(render, active && !hovered ? kActiveGreen.r : kGold.r,
+                                active && !hovered ? kActiveGreen.g : kGold.g,
+                                active && !hovered ? kActiveGreen.b : kGold.b, 200);
+        SDL_RenderDrawRect(render, &btn);
+
+        std::string label = kResolutionPresets[i].label;
+        if (active)
+            label += " (текущее)"; // marks the currently applied resolution
+        SDL_Color labelColor = hovered ? SDL_Color{20, 16, 10, 255} : (active ? kActiveGreen : kPink);
+        get_cached_texture(settingsButtonCache[i], label, 32, labelColor);
+        int lx = btn.x + (btn.w - settingsButtonCache[i].size.x) / 2;
+        int ly = btn.y + (btn.h - settingsButtonCache[i].size.y) / 2;
+        draw_cached_text(settingsButtonCache[i], label, lx, ly, labelColor, 32);
+    }
+
+    draw_cached_text_centered_x(settingsHintCache, "Esc / Enter - назад в меню", panel.x + panel.w / 2,
+                                 panel.y + panel.h - 40, kPink, 26);
 }
 
 void FrontendManager::draw_name_input(const std::string &currentName)
 {
     std::string display = currentName + "_";
     draw_dialog({
-        {"Введите имя игрока:", 24, kGold},
-        {display, 30, kText},
-        {"Enter - начать игру, Esc - в меню", 18, kPink},
+        {"Введите имя игрока:", 38, kGold},
+        {display, 48, kText},
+        {"Enter - начать игру, Esc - в меню", 29, kPink},
     });
 }
 
 void FrontendManager::draw_leaderboard(const std::vector<PlayerDatabase::Entry> &entries)
 {
-    constexpr int panelW = 560;
+    constexpr int panelW = 896;
     int rowCount = std::max<int>(1, std::min<int>(10, (int)entries.size()));
-    constexpr int rowH = 30;
-    int panelH = 100 + rowCount * rowH + 50;
+    constexpr int rowH = 48;
+    int panelH = 160 + rowCount * rowH + 80;
     int panelX = (UILayout::ScreenW - panelW) / 2;
     int panelY = (UILayout::ScreenH - panelH) / 2;
 
@@ -306,32 +360,32 @@ void FrontendManager::draw_leaderboard(const std::vector<PlayerDatabase::Entry> 
     SDL_RenderDrawRect(render, &panel);
 
     int centerX = UILayout::ScreenW / 2;
-    draw_cached_text_centered_x(leaderboardTitleCache, "Таблица игроков", centerX, panelY + 24, kGold, 26);
-    draw_cached_text_centered_x(leaderboardSubtitleCache, "(всего сбито блоков)", centerX, panelY + 56, kPink, 16);
+    draw_cached_text_centered_x(leaderboardTitleCache, "Таблица игроков", centerX, panelY + 38, kGold, 42);
+    draw_cached_text_centered_x(leaderboardSubtitleCache, "(всего сбито блоков)", centerX, panelY + 90, kPink, 26);
 
-    int y = panelY + 100;
+    int y = panelY + 160;
     int rank = 1;
     for (const auto &e : entries)
     {
         if (rank > 10)
             break;
         std::string line = std::to_string(rank) + ". " + e.name + " - " + std::to_string(e.totalBlocks);
-        draw_cached_text_centered_x(leaderboardRowCache[rank - 1], line, centerX, y, kText, 20);
+        draw_cached_text_centered_x(leaderboardRowCache[rank - 1], line, centerX, y, kText, 32);
         y += rowH;
         rank++;
     }
     if (entries.empty())
-        draw_cached_text_centered_x(leaderboardRowCache[0], "Пока нет результатов", centerX, y, kText, 20);
+        draw_cached_text_centered_x(leaderboardRowCache[0], "Пока нет результатов", centerX, y, kText, 32);
 
     draw_cached_text_centered_x(leaderboardHintCache, "Enter / Esc / клик - назад в меню", centerX,
-                                 panelY + panelH - 34, kPink, 16);
+                                 panelY + panelH - 54, kPink, 26);
 }
 
 void FrontendManager::draw_hud(int score, int level)
 {
     char buf[64];
     snprintf(buf, sizeof(buf), "Счёт: %d", score);
-    draw_chip(hudScoreCache, buf, 16, 12, kGold);
+    draw_chip(hudScoreCache, buf, 26, 19, kGold);
     snprintf(buf, sizeof(buf), "Уровень: %d", level + 1);
-    draw_chip(hudLevelCache, buf, UILayout::ScreenW - 16, 12, kGold, true);
+    draw_chip(hudLevelCache, buf, UILayout::ScreenW - 26, 19, kGold, true);
 }

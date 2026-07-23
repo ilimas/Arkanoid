@@ -24,6 +24,13 @@ class Ball
     SDL_Texture *texFire{nullptr};
     double speedElapsed{0.0}; // seconds of active play since last setmain()/sync, drives the speed ramp
 
+    // Real-time GLSL path (glossy shaded sphere with a subtly pulsing
+    // specular highlight, recomputed every frame): used when
+    // GLInterop::available() and this program compiled successfully; falls
+    // back to the CPU-baked texNormal/texFire path above otherwise.
+    unsigned int shaderProgram_{0};
+    SDL_Texture *shaderTarget_{nullptr};
+
   public:
     int radius;
 

@@ -7,17 +7,20 @@
 // always matches what FrontendManager actually draws.
 namespace UILayout
 {
-constexpr int ScreenW = 900;
-constexpr int ScreenH = 620;
+constexpr int ScreenW = 1440;
+constexpr int ScreenH = 992;
 
-constexpr SDL_Rect MenuPanel{480, 140, 380, 340};
-constexpr int MenuTitleY = MenuPanel.y + 34;
+// Tall enough for 4 rows of buttons (main menu: Новая игра/Выход/Таблица/
+// Настройки; settings screen reuses the same panel + button rects for its 4
+// resolution presets).
+constexpr SDL_Rect MenuPanel{768, 224, 608, 652};
+constexpr int MenuTitleY = MenuPanel.y + 54;
 
-constexpr int MenuButtonW = 300;
-constexpr int MenuButtonH = 52;
-constexpr int MenuButtonSpacing = 18;
+constexpr int MenuButtonW = 480;
+constexpr int MenuButtonH = 83;
+constexpr int MenuButtonSpacing = 29;
 constexpr int MenuButtonX = MenuPanel.x + (MenuPanel.w - MenuButtonW) / 2;
-constexpr int MenuButtonStartY = MenuPanel.y + 120;
+constexpr int MenuButtonStartY = MenuPanel.y + 192;
 
 constexpr SDL_Rect MenuButtonRect(int index)
 {

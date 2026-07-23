@@ -44,6 +44,14 @@ class Starfield
     std::vector<Comet> comets;
     float timeSinceLastComet{0.0f};
     float nextCometDelay{2.0f};
+    float totalTime_{0.0f};
+
+    // Real-time GLSL path (nebula + hashed twinkling stars + comet glow, all
+    // computed per-pixel every frame): used when GLInterop::available() and
+    // this program compiled successfully; falls back to the CPU-baked
+    // nebulaTex/cometTex path above otherwise.
+    unsigned int shaderProgram_{0};
+    SDL_Texture *shaderTarget_{nullptr};
 };
 
 #endif

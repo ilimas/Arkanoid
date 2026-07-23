@@ -14,9 +14,9 @@ BlockField::BlockField(SDL_Renderer *ren_)
         for (int j = 0; j < 16; j++)
             map[i][j] = 0;
 
-    texGreen = ProceduralTextures::makeBrickTexture(render, 50, 15, SDL_Color{96, 214, 110, 255});
-    texOrange = ProceduralTextures::makeBrickTexture(render, 50, 15, SDL_Color{255, 150, 60, 255});
-    texStone = ProceduralTextures::makeBrickTexture(render, 50, 15, SDL_Color{128, 132, 145, 255});
+    texGreen = ProceduralTextures::makeBrickTexture(render, 80, 24, SDL_Color{96, 214, 110, 255});
+    texOrange = ProceduralTextures::makeBrickTexture(render, 80, 24, SDL_Color{255, 150, 60, 255});
+    texStone = ProceduralTextures::makeBrickTexture(render, 80, 24, SDL_Color{128, 132, 145, 255});
 }
 
 BlockField::~BlockField()
@@ -117,14 +117,14 @@ void BlockField::load_level(int levelNum)
         break;
     }
 
-    temp.r.h = 15;
-    temp.r.w = 50;
+    temp.r.h = 24;
+    temp.r.w = 80;
     for (int i = 0; i < 26; i++)
         for (int j = 0; j < 16; j++)
         {
             if (map[i][j] == 0) continue;
-            temp.r.y = i * 15 + 30; // 30px top margin keeps blocks away from wall-bounce zone
-            temp.r.x = j * 50 + 50; // 50px left margin centers 16 cols in 900px screen
+            temp.r.y = i * 24 + 48; // 48px top margin keeps blocks away from wall-bounce zone
+            temp.r.x = j * 80 + 80; // 80px left margin centers 16 cols in 1440px screen
             temp.var = map[i][j];   // -1=stone, 1=single-hit, 2=double-hit
             a.push_back(temp);
         }

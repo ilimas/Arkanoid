@@ -7,10 +7,10 @@
 Paddel::Paddel(SDL_Renderer *ren)
 {
     render=ren;
-    nblock.x=400;
-    nblock.y=600;
-    nblock.w=120;
-    nblock.h=10;
+    nblock.x=640;
+    nblock.y=960;
+    nblock.w=192;
+    nblock.h=16;
     timg = ProceduralTextures::makeBarTexture(render, nblock.w, nblock.h, SDL_Color{70, 190, 255, 255});
 }
 Paddel::~Paddel()
@@ -23,10 +23,10 @@ int Paddel::rety()
 }
 void Paddel::setmain()
 {
-    nblock.x=400;
-    nblock.y=600;
-    nblock.w=120;
-    nblock.h=10;
+    nblock.x=640;
+    nblock.y=960;
+    nblock.w=192;
+    nblock.h=16;
 }
 int Paddel::retx()
 {

@@ -4,13 +4,16 @@
 #include "Bricks.h"
 #include "EventManager.h"
 #include "FrontendManager.h"
+#include "GLInterop.h"
 #include "Paddel.h"
+#include "ResolutionPresets.h"
 #include <SDL_mixer.h>
 #include <SDL_rect.h>
 #include <SDL_render.h>
 #include <SDL_timer.h>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <iostream>
 #include <algorithm>
@@ -20,7 +23,7 @@
 #include <vector>
 
 Game::Game()
-    : playerDb(SNACKS_DIR "/players.txt"), bounds{0, 0, 900, 620}, frontend(nullptr), renderer(nullptr),
+    : playerDb(SNACKS_DIR "/players.txt"), bounds{0, 0, 1440, 992}, frontend(nullptr), renderer(nullptr),
       window(nullptr), music(nullptr)
 {
 }
@@ -45,7 +48,7 @@ int Game::run()
     int windowW = (int)(bounds.w * windowScale);
     int windowH = (int)(bounds.h * windowScale);
     window = SDL_CreateWindow("Shalnoi (refactor)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowW,
-                               windowH, SDL_WINDOW_SHOWN);
+                               windowH, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
     if (!window)
     {
         std::cerr << "CreateWindow: " << SDL_GetError() << "\n";
@@ -54,12 +57,27 @@ int Game::run()
     // VSync is left off and replaced with an explicit 120 FPS cap (limitFrameRate())
     // so the frame rate is a fixed target regardless of the display's actual
     // refresh rate, instead of whatever the compositor happens to hand back.
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    // The opengl driver is requested explicitly (rather than -1/"best available")
+    // so GLInterop can reliably borrow the same GL context for its shader passes;
+    // if this specific driver isn't available on the host, fall back to -1 and
+    // every shader effect below will just no-op back to its CPU-baked texture.
+    int glDriverIndex = -1;
+    for (int i = 0; i < SDL_GetNumRenderDrivers(); i++)
+    {
+        SDL_RendererInfo info;
+        if (SDL_GetRenderDriverInfo(i, &info) == 0 && std::strcmp(info.name, "opengl") == 0)
+        {
+            glDriverIndex = i;
+            break;
+        }
+    }
+    renderer = SDL_CreateRenderer(window, glDriverIndex, SDL_RENDERER_ACCELERATED);
     if (!renderer)
     {
         std::cerr << "CreateRenderer: " << SDL_GetError() << "\n";
         return 1;
     }
+    GLInterop::init(renderer);
     SDL_RenderSetLogicalSize(renderer, bounds.w, bounds.h);
     frameFreq = SDL_GetPerformanceFrequency();
     lastFrameCounter = SDL_GetPerformanceCounter();
@@ -92,6 +110,7 @@ int Game::run()
     int score = 0;
     std::string currentPlayerName;
     long long totalBlocksThisRun = 0;
+    int currentResIndex = -1; // which preset (if any) matches the active window size, for the Settings screen
     uint32_t tstart = SDL_GetTicks();
     SDL_ShowCursor(SDL_ENABLE);
     while (!eventManager.getState().gameOver)
@@ -113,6 +132,31 @@ int Game::run()
                 eventManager.pollEvents();
                 frontend->draw_background();
                 frontend->draw_leaderboard(playerDb.getSorted());
+                SDL_RenderPresent(renderer);
+                limitFrameRate();
+            }
+            if (eventManager.getState().gameOver)
+                break;
+            continue;
+        }
+
+        if (eventManager.getState().gameSettings)
+        {
+            while (eventManager.getState().gameSettings)
+            {
+                eventManager.pollEvents();
+                int idx = eventManager.getState().pendingResolutionIndex;
+                if (idx >= 0)
+                {
+                    eventManager.getState().pendingResolutionIndex = -1;
+                    if (idx < kResolutionPresetCount)
+                    {
+                        applyResolution(kResolutionPresets[idx].w, kResolutionPresets[idx].h);
+                        currentResIndex = idx;
+                    }
+                }
+                frontend->draw_background();
+                frontend->draw_settings(eventManager.getState().settingsSelectedItem, currentResIndex);
                 SDL_RenderPresent(renderer);
                 limitFrameRate();
             }
@@ -206,13 +250,13 @@ int Game::run()
             float logicalMx, logicalMy;
             SDL_RenderWindowToLogical(renderer, mx, my, &logicalMx, &logicalMy);
             mx = (int)logicalMx;
-            if (mx >= 50 && mx <= 830)
+            if (mx >= 80 && mx <= 1328)
             {
-                paddel->setpos(mx - 50);
+                paddel->setpos(mx - 80);
             }
 
             frontend->draw_background();
-            if (ball->get_position().y >= (float)(bounds.h - 10))
+            if (ball->get_position().y >= (float)(bounds.h - 16))
             {
                 if (ball2Active)
                 {
@@ -347,7 +391,7 @@ int Game::run()
                         newDir.y = newDir.y >= 0 ? 0.2 : -0.2;
                         newDir = newDir.normalized();
                     }
-                    ball->set_position(ball->get_position() + newDir * (50.0 + ball->radius));
+                    ball->set_position(ball->get_position() + newDir * (80.0 + ball->radius));
                     ball->set_destination(newDir * ballStuckSpeed);
                 }
             }
@@ -358,7 +402,7 @@ int Game::run()
 
             if (ball2Active)
             {
-                if (ball2->get_position().y >= (float)(bounds.h - 10))
+                if (ball2->get_position().y >= (float)(bounds.h - 16))
                 {
                     ball2Active = false;
                 }
@@ -443,14 +487,14 @@ int Game::run()
             paddel->draw();
             bricksField->draw();
 
-            constexpr double powerUpFallSpeed = 120.0; // px/sec
+            constexpr double powerUpFallSpeed = 192.0; // px/sec
             for (int i = (int)powerUps.size() - 1; i >= 0; i--)
             {
                 powerUps[i].pos.y += powerUpFallSpeed * dt;
-                bool hit = powerUps[i].pos.y + 7 >= paddel->rety() &&
-                           powerUps[i].pos.y - 7 <= paddel->rety() + 10 &&
-                           powerUps[i].pos.x + 15 >= paddel->retx() &&
-                           powerUps[i].pos.x - 15 <= paddel->retx() + paddel->retw();
+                bool hit = powerUps[i].pos.y + 11 >= paddel->rety() &&
+                           powerUps[i].pos.y - 11 <= paddel->rety() + 16 &&
+                           powerUps[i].pos.x + 24 >= paddel->retx() &&
+                           powerUps[i].pos.x - 24 <= paddel->retx() + paddel->retw();
                 if (hit)
                 {
                     if (powerUps[i].isDuplicate)
@@ -461,7 +505,7 @@ int Game::run()
                             ball2->set_position(ball->get_position());
                             Vec2 d = ball->get_destination();
                             ball2->set_destination({-d.x, d.y});
-                            ball2->radius = 10;
+                            ball2->radius = 16;
                             ball2->setSpeedElapsed(ball->getSpeedElapsed());
                             if (ball->isFireBall())
                                 ball2->activateFireBall(4000);
@@ -481,7 +525,7 @@ int Game::run()
                 }
                 else
                 {
-                    SDL_Rect pr = {(int)powerUps[i].pos.x - 15, (int)powerUps[i].pos.y - 7, 30, 14};
+                    SDL_Rect pr = {(int)powerUps[i].pos.x - 24, (int)powerUps[i].pos.y - 11, 48, 22};
                     if (powerUps[i].isDuplicate)
                         SDL_SetRenderDrawColor(renderer, 0, 150, 255, 255);
                     else
@@ -565,6 +609,16 @@ int Game::run()
     }
     cleanup();
     return 0;
+}
+
+void Game::applyResolution(int w, int h)
+{
+    // The logical canvas (bounds.w x bounds.h) never changes - only the
+    // window's actual pixel size does, so no renderer/texture recreation is
+    // needed. SDL letterboxes the fixed-aspect canvas to fit the new window.
+    SDL_SetWindowSize(window, w, h);
+    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    eventManager.setLogicalScale((double)w / bounds.w, (double)h / bounds.h);
 }
 
 void Game::limitFrameRate()

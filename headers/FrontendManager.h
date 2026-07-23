@@ -44,7 +44,10 @@ class FrontendManager
 
     TextCache hudScoreCache, hudLevelCache;
     TextCache menuTitleCache;
-    std::array<TextCache, 3> menuButtonCache;
+    std::array<TextCache, 4> menuButtonCache;
+    TextCache settingsTitleCache;
+    std::array<TextCache, 4> settingsButtonCache; // one per resolution preset, see ResolutionPresets.h
+    TextCache settingsHintCache;
     std::array<TextCache, 4> dialogLineCache;
     TextCache bannerCache;
     TextCache leaderboardTitleCache, leaderboardSubtitleCache, leaderboardHintCache;
@@ -68,6 +71,7 @@ class FrontendManager
     void level_cleared(double a);
     void draw_end();
     void draw_menu(int menu);
+    void draw_settings(int hoverIndex, int activeResIndex);
     void draw_name_input(const std::string &currentName);
     void draw_leaderboard(const std::vector<PlayerDatabase::Entry> &entries);
     void draw_hud(int score, int level);

@@ -17,8 +17,11 @@ struct GameState
     bool gameMenu;
     bool gameNameInput;
     bool gameLeaderboard;
+    bool gameSettings;
     bool appQuit;
     uint8_t menuSelectedItem;
+    uint8_t settingsSelectedItem;
+    int pendingResolutionIndex; // set by dispatch() on a settings-screen click, consumed by Game::run()
 };
 
 // Polls SDL input once per frame from the main thread (no background threads
