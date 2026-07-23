@@ -1,21 +1,19 @@
 #include "Paddel.h"
 #include "ProceduralTextures.h"
-#include <SDL.h>
-#include <SDL_ttf.h>
 
 
-Paddel::Paddel(SDL_Renderer *ren)
+Paddel::Paddel(GLRenderer &gl_)
 {
-    render=ren;
+    gl=&gl_;
     nblock.x=640;
     nblock.y=960;
     nblock.w=192;
     nblock.h=16;
-    timg = ProceduralTextures::makeBarTexture(render, nblock.w, nblock.h, SDL_Color{70, 190, 255, 255});
+    timg = ProceduralTextures::makeBarTexture(*gl, nblock.w, nblock.h, Color{70, 190, 255, 255});
 }
 Paddel::~Paddel()
 {
-    SDL_DestroyTexture(timg);
+    gl->destroyTexture(timg);
 }
 int Paddel::rety()
 {
@@ -34,7 +32,7 @@ int Paddel::retx()
 }
 void Paddel::draw()
 {
-    SDL_RenderCopy(render, timg, NULL, &nblock);
+    gl->drawTexture(timg, nblock);
 }
 void Paddel::setpos(int x)
 {

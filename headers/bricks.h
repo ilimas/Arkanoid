@@ -1,8 +1,9 @@
 #ifndef BRICKS_H
 #define BRICKS_H
 
+#include "GLRenderer.h"
+#include "Types.h"
 #include "Utils.h"
-#include <SDL_render.h>
 #include <cstdint>
 #include <random>
 #include <vector>
@@ -21,7 +22,7 @@ class Ball;
 class SingleBlock
 {
   public:
-    SDL_Rect r;
+    Rect r;
     int var;
 
     HitSide detectHitSide(const Vec2 &ballPos, double ball_radius);
@@ -35,14 +36,14 @@ class BlockField
     uint32_t destructibleStartingSize{};
     SingleBlock temp;
     int map[26][16];
-    SDL_Renderer *render;
-    SDL_Texture *texGreen, *texOrange, *texStone;
+    GLRenderer *gl;
+    GLRenderer::Texture texGreen, texOrange, texStone;
     std::vector<int> levelBag;
     size_t bagIndex{0};
     std::mt19937 rng{std::random_device{}()};
 
   public:
-    BlockField(SDL_Renderer *ren_);
+    BlockField(GLRenderer &gl_);
     ~BlockField();
     void draw();
     std::vector<SingleBlock> &getBlocksVector() { return a; }

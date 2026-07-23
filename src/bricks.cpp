@@ -2,28 +2,26 @@
 #include "Ball.h"
 #include "ProceduralTextures.h"
 #include "Utils.h"
-#include <SDL.h>
-#include <SDL_rect.h>
 #include <algorithm>
 #include <cstdlib>
 
-BlockField::BlockField(SDL_Renderer *ren_)
+BlockField::BlockField(GLRenderer &gl_)
 {
-    render = ren_;
+    gl = &gl_;
     for (int i = 0; i < 26; i++)
         for (int j = 0; j < 16; j++)
             map[i][j] = 0;
 
-    texGreen = ProceduralTextures::makeBrickTexture(render, 80, 24, SDL_Color{96, 214, 110, 255});
-    texOrange = ProceduralTextures::makeBrickTexture(render, 80, 24, SDL_Color{255, 150, 60, 255});
-    texStone = ProceduralTextures::makeBrickTexture(render, 80, 24, SDL_Color{128, 132, 145, 255});
+    texGreen = ProceduralTextures::makeBrickTexture(*gl, 80, 24, Color{96, 214, 110, 255});
+    texOrange = ProceduralTextures::makeBrickTexture(*gl, 80, 24, Color{255, 150, 60, 255});
+    texStone = ProceduralTextures::makeBrickTexture(*gl, 80, 24, Color{128, 132, 145, 255});
 }
 
 BlockField::~BlockField()
 {
-    SDL_DestroyTexture(texGreen);
-    SDL_DestroyTexture(texOrange);
-    SDL_DestroyTexture(texStone);
+    gl->destroyTexture(texGreen);
+    gl->destroyTexture(texOrange);
+    gl->destroyTexture(texStone);
 }
 
 int BlockField::rety(int i) { return a[i].r.y; }
@@ -141,8 +139,8 @@ void BlockField::draw()
 {
     for (int i = 0; i < (int)a.size(); i++)
     {
-        SDL_Texture *tex = (a[i].var < 0) ? texStone : (a[i].var == 1 ? texGreen : texOrange);
-        SDL_RenderCopy(render, tex, nullptr, &a[i].r);
+        const GLRenderer::Texture &tex = (a[i].var < 0) ? texStone : (a[i].var == 1 ? texGreen : texOrange);
+        gl->drawTexture(tex, a[i].r);
     }
 }
 

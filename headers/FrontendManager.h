@@ -1,27 +1,30 @@
 #ifndef FRONTEND_MANAGER_H
 #define FRONTEND_MANAGER_H
 
+#include "GLRenderer.h"
 #include "PlayerDatabase.h"
 #include "Starfield.h"
-#include <SDL.h>
-#include <SDL_ttf.h>
+#include "TextRenderer.h"
+#include "Types.h"
 #include <array>
+#include <cstdint>
 #include <memory>
-#include <stdlib.h>
 #include <string>
 #include <vector>
 
 class FrontendManager
 {
-    // Caches one rasterized text texture (rendered in white, tinted per-draw via
-    // SDL_SetTextureColorMod) so a frame that repaints the same string only pays
-    // for a glyph re-rasterization when the text or size actually changes.
+    // Caches one rasterized text texture (rendered in white; tinted at draw
+    // time via GLRenderer::drawTexture's color param) so a frame that repaints
+    // the same string only pays for a glyph re-rasterization when the text or
+    // size actually changed.
     struct TextCache
     {
         std::string text;
         int fontSize = -1;
-        SDL_Texture *texture = nullptr;
-        SDL_Point size{0, 0};
+        GLRenderer::Texture texture{};
+        Point size{0, 0};
+        GLRenderer *gl{nullptr};
 
         ~TextCache();
         TextCache() = default;
@@ -33,14 +36,14 @@ class FrontendManager
     {
         std::string text;
         int fontSize;
-        SDL_Color color;
+        Color color;
     };
 
-    SDL_Texture *tmenu;
-    SDL_Renderer *render;
-    TTF_Font *fnt;
+    GLRenderer::Texture tmenu;
+    GLRenderer *gl;
+    std::unique_ptr<TextRenderer> textRenderer_;
     std::unique_ptr<Starfield> starfield;
-    Uint32 lastBackgroundTicks;
+    uint32_t lastBackgroundTicks;
 
     TextCache hudScoreCache, hudLevelCache;
     TextCache menuTitleCache;
@@ -53,17 +56,17 @@ class FrontendManager
     TextCache leaderboardTitleCache, leaderboardSubtitleCache, leaderboardHintCache;
     std::array<TextCache, 10> leaderboardRowCache;
 
-    SDL_Texture *get_cached_texture(TextCache &cache, const std::string &utf8, int fontSize, SDL_Color color);
-    void draw_cached_text(TextCache &cache, const std::string &utf8, int x, int y, SDL_Color color, int fontSize);
-    void draw_cached_text_centered_x(TextCache &cache, const std::string &utf8, int centerX, int y, SDL_Color color,
+    void get_cached_texture(TextCache &cache, const std::string &utf8, int fontSize);
+    void draw_cached_text(TextCache &cache, const std::string &utf8, int x, int y, Color color, int fontSize);
+    void draw_cached_text_centered_x(TextCache &cache, const std::string &utf8, int centerX, int y, Color color,
                                       int fontSize);
-    void draw_dim_overlay(Uint8 alpha = 140);
+    void draw_dim_overlay(uint8_t alpha = 140);
     void draw_dialog(const std::vector<DialogLine> &lines);
-    void draw_banner(const std::string &utf8, int y, int fontSize, SDL_Color color);
-    void draw_chip(TextCache &cache, const std::string &utf8, int x, int y, SDL_Color color, bool alignRight = false);
+    void draw_banner(const std::string &utf8, int y, int fontSize, Color color);
+    void draw_chip(TextCache &cache, const std::string &utf8, int x, int y, Color color, bool alignRight = false);
 
   public:
-    FrontendManager(SDL_Renderer *ren);
+    FrontendManager(GLRenderer &gl_);
     ~FrontendManager();
     void draw_welcome_text();
     void draw_pause();

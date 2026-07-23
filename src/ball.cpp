@@ -1,70 +1,17 @@
 #include "Ball.h"
-#include "GLInterop.h"
 #include "Paddel.h"
 #include "Bricks.h"
+#include "Clock.h"
 #include "ProceduralTextures.h"
 #include "Utils.h"
-#include <SDL.h>
-#include <SDL_mixer.h>
-#include <SDL_rect.h>
-#include <SDL_ttf.h>
 #include <algorithm>
-#include <math.h>
+#include <cmath>
+#include <numbers>
 #include <optional>
 
-namespace
+Ball::Ball(Rect bounds_, GLRenderer &gl_)
 {
-const char *kBallVertexShader = R"GLSL(
-#version 120
-attribute vec2 aPos;
-attribute vec2 aUV;
-varying vec2 vUV;
-void main()
-{
-    vUV = aUV;
-    gl_Position = vec4(aPos, 0.0, 1.0);
-}
-)GLSL";
-
-// Glossy shaded sphere with an offset specular highlight that drifts subtly
-// over time - replaces the CPU-baked makeSphereTexture look with a per-pixel,
-// per-frame version so the highlight never looks perfectly static.
-const char *kBallFragmentShader = R"GLSL(
-#version 120
-varying vec2 vUV;
-uniform vec2 uResolution;
-uniform float uTime;
-uniform vec3 uBaseColor;
-
-void main()
-{
-    float r = uResolution.x * 0.5;
-    vec2 center = uResolution * 0.5;
-    vec2 px = vUV * uResolution;
-    float dist = length(px - center);
-    if (dist > r + 0.5)
-    {
-        gl_FragColor = vec4(0.0);
-        return;
-    }
-
-    float pulse = 0.05 * sin(uTime * 2.2);
-    vec2 hl = center - vec2(r * (0.35 + pulse), r * 0.35);
-    float distToHl = length(px - hl);
-    float highlight = max(0.0, 1.0 - distToHl / (r * 0.85));
-    float rim = max(0.0, (dist / r - 0.7) / 0.3);
-    float f = 0.6 + 0.9 * highlight - 0.35 * rim;
-
-    vec3 col = uBaseColor * f;
-    float alpha = clamp(1.0 - max(0.0, dist - (r - 1.0)), 0.0, 1.0);
-    gl_FragColor = vec4(col, alpha);
-}
-)GLSL";
-} // namespace
-
-Ball::Ball(SDL_Rect bounds_, SDL_Renderer *ren_)
-{
-    render = ren_;
+    gl = &gl_;
     bounds = bounds_;
     ratio = (1.f * bounds.w) / bounds.h;
     position.x = 720;
@@ -73,63 +20,22 @@ Ball::Ball(SDL_Rect bounds_, SDL_Renderer *ren_)
     radius = 16;
     alf = std::numbers::pi / 2;
     fx = 0;
-    texNormal = ProceduralTextures::makeSphereTexture(render, radius * 2, SDL_Color{225, 60, 60, 255});
-    texFire = ProceduralTextures::makeSphereTexture(render, radius * 2, SDL_Color{255, 165, 20, 255});
-
-    if (GLInterop::available())
-    {
-        shaderProgram_ = GLInterop::compileProgram(kBallVertexShader, kBallFragmentShader);
-        if (shaderProgram_)
-        {
-            shaderTarget_ = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
-                                               radius * 2, radius * 2);
-            if (shaderTarget_)
-                SDL_SetTextureBlendMode(shaderTarget_, SDL_BLENDMODE_BLEND);
-            else
-            {
-                GLInterop::destroyProgram(shaderProgram_);
-                shaderProgram_ = 0;
-            }
-        }
-    }
+    texNormal = ProceduralTextures::makeSphereTexture(*gl, radius * 2, Color{225, 60, 60, 255});
+    texFire = ProceduralTextures::makeSphereTexture(*gl, radius * 2, Color{255, 165, 20, 255});
 }
 
 Ball::~Ball()
 {
-    SDL_DestroyTexture(texNormal);
-    SDL_DestroyTexture(texFire);
-    if (shaderTarget_)
-        SDL_DestroyTexture(shaderTarget_);
-    GLInterop::destroyProgram(shaderProgram_);
+    gl->destroyTexture(texNormal);
+    gl->destroyTexture(texFire);
 }
 
 void Ball::draw()
 {
     radius = 16;
-    SDL_Rect dst{(int)(position.x - radius), (int)(position.y - radius), radius * 2, radius * 2};
-
-    if (GLInterop::available() && shaderProgram_ && shaderTarget_)
-    {
-        SDL_Color base = fireBallActive ? SDL_Color{255, 165, 20, 255} : SDL_Color{225, 60, 60, 255};
-        float t = SDL_GetTicks() / 1000.0f;
-
-        SDL_Texture *prevTarget = SDL_GetRenderTarget(render);
-        SDL_SetRenderTarget(render, shaderTarget_);
-        GLInterop::setViewport(radius * 2, radius * 2);
-        GLInterop::setUniform2f(GLInterop::getUniformLocation(shaderProgram_, "uResolution"), (float)(radius * 2),
-                                 (float)(radius * 2));
-        GLInterop::setUniform1f(GLInterop::getUniformLocation(shaderProgram_, "uTime"), t);
-        GLInterop::setUniform3f(GLInterop::getUniformLocation(shaderProgram_, "uBaseColor"), base.r / 255.0f,
-                                 base.g / 255.0f, base.b / 255.0f);
-        GLInterop::drawFullscreenQuad(shaderProgram_, "aPos", "aUV");
-        SDL_SetRenderTarget(render, prevTarget);
-
-        SDL_RenderCopy(render, shaderTarget_, nullptr, &dst);
-        return;
-    }
-
-    SDL_Texture *tex = fireBallActive ? texFire : texNormal;
-    SDL_RenderCopy(render, tex, nullptr, &dst);
+    Rect dst{(int)(position.x - radius), (int)(position.y - radius), radius * 2, radius * 2};
+    const GLRenderer::Texture &tex = fireBallActive ? texFire : texNormal;
+    gl->drawTexture(tex, dst);
 }
 void Ball::setgy() { destination.y = -destination.y; }
 void Ball::setgx() { destination.x = -destination.x; }
@@ -227,12 +133,12 @@ void Ball::setmain()
 void Ball::activateFireBall(uint32_t durationMs)
 {
     fireBallActive = true;
-    fireBallEnd = SDL_GetTicks() + durationMs;
+    fireBallEnd = nowMs() + durationMs;
 }
 
 void Ball::updateFireBall()
 {
-    if (fireBallActive && SDL_GetTicks() >= fireBallEnd)
+    if (fireBallActive && nowMs() >= fireBallEnd)
         fireBallActive = false;
 }
 

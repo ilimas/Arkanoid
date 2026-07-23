@@ -2,119 +2,127 @@
 #include "Ball.h"
 #include "BlackHole.h"
 #include "Bricks.h"
+#include "Clock.h"
 #include "EventManager.h"
 #include "FrontendManager.h"
 #include "Paddel.h"
 #include "ResolutionPresets.h"
-#include <SDL_mixer.h>
-#include <SDL_rect.h>
-#include <SDL_render.h>
-#include <SDL_timer.h>
-#include <cstdint>
+#include <GLFW/glfw3.h>
+#include <algorithm>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
-#include <algorithm>
 #include <memory>
 #include <numbers>
 #include <utility>
 #include <vector>
 
+namespace
+{
+// GLFW doesn't have an SDL_WINDOWPOS_CENTERED-style creation flag - center
+// manually against the primary monitor's video mode after creating/resizing.
+void centerWindow(GLFWwindow *window, int w, int h)
+{
+    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+    if (!monitor)
+        return;
+    const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+    if (!mode)
+        return;
+    glfwSetWindowPos(window, (mode->width - w) / 2, (mode->height - h) / 2);
+}
+} // namespace
+
 Game::Game()
-    : playerDb(SNACKS_DIR "/players.txt"), bounds{0, 0, 1440, 992}, frontend(nullptr), renderer(nullptr),
-      window(nullptr), music(nullptr)
+    : playerDb(SNACKS_DIR "/players.txt"), bounds{0, 0, 1440, 992}, frontend(nullptr), window(nullptr)
 {
 }
 
 int Game::run()
 {
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
-    if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
+    if (!glfwInit())
     {
-        std::cerr << "SDL_Init Error: " << SDL_GetError() << "\n";
+        std::cerr << "glfwInit failed\n";
         return 1;
     }
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+
     double windowScale = 2.0;
-    SDL_Rect displayBounds;
-    if (SDL_GetDisplayUsableBounds(0, &displayBounds) == 0)
+    if (GLFWmonitor *monitor = glfwGetPrimaryMonitor())
     {
-        double maxScaleW = (displayBounds.w * 0.9) / bounds.w;
-        double maxScaleH = (displayBounds.h * 0.9) / bounds.h;
+        int workX, workY, workW, workH;
+        glfwGetMonitorWorkarea(monitor, &workX, &workY, &workW, &workH);
+        double maxScaleW = (workW * 0.9) / bounds.w;
+        double maxScaleH = (workH * 0.9) / bounds.h;
         windowScale = std::clamp(std::min(maxScaleW, maxScaleH), 1.0, 3.0);
     }
     int windowW = (int)(bounds.w * windowScale);
     int windowH = (int)(bounds.h * windowScale);
-    window = SDL_CreateWindow("Shalnoi (refactor)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowW,
-                               windowH, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_DEPTH_BITS, 0);
+    glfwWindowHint(GLFW_STENCIL_BITS, 0);
+
+    window = glfwCreateWindow(windowW, windowH, "Shalnoi (refactor)", nullptr, nullptr);
     if (!window)
     {
-        std::cerr << "CreateWindow: " << SDL_GetError() << "\n";
+        std::cerr << "glfwCreateWindow failed\n";
+        glfwTerminate();
         return 1;
     }
-    // VSync is back on: presenting untimed (just SDL_Delay-paced to ~120fps)
-    // caused visible tearing and uneven/jerky motion, since SDL_Delay's timer
-    // resolution isn't precise enough to pace frames smoothly on its own and
-    // nothing was blocking presentation to the display's actual refresh.
-    // limitFrameRate() stays as a backstop cap (harmless with vsync on, since
-    // SDL_RenderPresent already blocks for a whole vblank - it only matters if
-    // vsync isn't actually honored on a given system/driver).
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!renderer)
-    {
-        std::cerr << "CreateRenderer: " << SDL_GetError() << "\n";
-        return 1;
-    }
-    // GLInterop::init(renderer) is deliberately NOT called: interleaving raw GL
-    // draws (for the shader-based background/black-hole/ball-glow effects)
-    // with SDL_render corrupted SDL's own GL state cache in practice (garbled
-    // HUD text, a solid black square instead of the ball, a flat background
-    // with no nebula/stars) - every effect's GLInterop::available() check
-    // means they all cleanly fall back to their CPU-baked textures as long as
-    // this stays uninitialized. See GLInterop.h/.cpp and Starfield/BlackHole/
-    // Ball's shader paths for the (currently unused) real-time-shader code.
-    SDL_RenderSetLogicalSize(renderer, bounds.w, bounds.h);
-    frameFreq = SDL_GetPerformanceFrequency();
-    lastFrameCounter = SDL_GetPerformanceCounter();
-    eventManager.setLogicalScale((double)windowW / bounds.w, (double)windowH / bounds.h);
-    if (Mix_OpenAudio(22050, MIX_DEFAULT_FORMAT, 2, 4096) == -1)
-    {
-        std::cerr << "Mix_OpenAudio failed\n";
-    }
-    else
-    {
-        // music = Mix_LoadMUS(SNACKS_DIR "/music/shrek.wav");
-        // if (music)
-        //     Mix_PlayMusic(music, -1);
-    }
+    centerWindow(window, windowW, windowH);
+    glfwShowWindow(window);
 
-    frontend = std::make_unique<FrontendManager>(renderer);
-    paddel = std::make_unique<Paddel>(renderer);
-    bricksField = std::make_unique<BlockField>(renderer);
-    ball = std::make_unique<Ball>(bounds, renderer);
-    blackHole = std::make_unique<BlackHole>(bounds, renderer);
+    // Every draw in the game goes through GLRenderer (raw OpenGL, GL 3.3 core)
+    // instead of a windowing toolkit's own 2D renderer - see GLRenderer.h.
+    try
+    {
+        gl = std::make_unique<GLRenderer>(window);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "GLRenderer init failed: " << e.what() << "\n";
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return 1;
+    }
+    glfwSwapInterval(1); // vsync: avoids tearing/uneven pacing (see limitFrameRate below)
+    lastFrameTime_ = std::chrono::steady_clock::now();
+    eventManager.attachWindow(window);
+    eventManager.setViewport(gl->viewportX(), gl->viewportY(), gl->viewportW(), gl->viewportH());
+
+    frontend = std::make_unique<FrontendManager>(*gl);
+    paddel = std::make_unique<Paddel>(*gl);
+    bricksField = std::make_unique<BlockField>(*gl);
+    ball = std::make_unique<Ball>(bounds, *gl);
+    blackHole = std::make_unique<BlackHole>(bounds, *gl);
     bool ballStuckInHole = false;
     uint32_t ballStuckTime = 0;
     double ballStuckSpeed = 0.0;
     struct PowerUp { Vec2 pos; bool isDuplicate; };
     std::vector<PowerUp> powerUps;
-    auto ball2 = std::make_unique<Ball>(bounds, renderer);
+    ball2 = std::make_unique<Ball>(bounds, *gl);
     bool ball2Active = false;
     int levelNumber = 0;
-    int mx = 0, my = 0;
+    int mx = 0;
     int score = 0;
     std::string currentPlayerName;
     long long totalBlocksThisRun = 0;
     int currentResIndex = -1; // which preset (if any) matches the active window size, for the Settings screen
-    uint32_t tstart = SDL_GetTicks();
-    SDL_ShowCursor(SDL_ENABLE);
+    uint32_t tstart = nowMs();
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     while (!eventManager.getState().gameOver)
     {
         while (eventManager.getState().gameMenu)
         {
             eventManager.pollEvents();
+            gl->beginFrame();
             frontend->draw_menu(eventManager.getState().menuSelectedItem);
-            SDL_RenderPresent(renderer);
+            gl->present(window);
             limitFrameRate();
         }
         if (eventManager.getState().gameOver)
@@ -125,9 +133,10 @@ int Game::run()
             while (eventManager.getState().gameLeaderboard)
             {
                 eventManager.pollEvents();
+                gl->beginFrame();
                 frontend->draw_background();
                 frontend->draw_leaderboard(playerDb.getSorted());
-                SDL_RenderPresent(renderer);
+                gl->present(window);
                 limitFrameRate();
             }
             if (eventManager.getState().gameOver)
@@ -150,9 +159,10 @@ int Game::run()
                         currentResIndex = idx;
                     }
                 }
+                gl->beginFrame();
                 frontend->draw_background();
                 frontend->draw_settings(eventManager.getState().settingsSelectedItem, currentResIndex);
-                SDL_RenderPresent(renderer);
+                gl->present(window);
                 limitFrameRate();
             }
             if (eventManager.getState().gameOver)
@@ -162,16 +172,15 @@ int Game::run()
 
         if (eventManager.getState().gameNameInput)
         {
-            SDL_StartTextInput();
             while (eventManager.getState().gameNameInput)
             {
                 eventManager.pollEvents();
+                gl->beginFrame();
                 frontend->draw_background();
                 frontend->draw_name_input(eventManager.getNameInputText());
-                SDL_RenderPresent(renderer);
+                gl->present(window);
                 limitFrameRate();
             }
-            SDL_StopTextInput();
             if (eventManager.getState().gameOver)
                 break;
             if (eventManager.getState().gameMenu)
@@ -194,22 +203,23 @@ int Game::run()
         ball2->setmain();
         powerUps.clear();
         score = 0;
-        tstart = SDL_GetTicks();
+        tstart = nowMs();
 
         while (eventManager.getState().gameWelcome)
         {
             eventManager.pollEvents();
+            gl->beginFrame();
             frontend->draw_background();
             paddel->draw();
             bricksField->draw();
             ball->draw();
             frontend->draw_welcome_text();
-            SDL_RenderPresent(renderer);
+            gl->present(window);
             limitFrameRate();
         }
 
-        SDL_ShowCursor(SDL_DISABLE);
-        uint32_t lastPhysicsTicks = SDL_GetTicks();
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+        uint32_t lastPhysicsTicks = nowMs();
         bool justResumed = false;
         while (eventManager.getState().gameStart)
         {
@@ -217,9 +227,10 @@ int Game::run()
             while (eventManager.getState().gamePaused)
             {
                 eventManager.pollEvents();
+                gl->beginFrame();
                 frontend->draw_background();
                 frontend->draw_pause();
-                SDL_RenderPresent(renderer);
+                gl->present(window);
                 limitFrameRate();
             }
             if (wasPaused)
@@ -228,6 +239,7 @@ int Game::run()
                 break;
 
             eventManager.pollEvents();
+            gl->beginFrame();
 
             // Frame-rate independent timestep: everything below moves at a
             // px/sec rate scaled by dt, not a fixed amount per rendered frame,
@@ -236,15 +248,15 @@ int Game::run()
             // duration itself never turns into a single oversized physics step,
             // and it's clamped so any other hitch can't tunnel the ball through
             // the paddle/bricks either.
-            uint32_t nowTicks = SDL_GetTicks();
+            uint32_t nowTicks = nowMs();
             double dt = justResumed ? 0.0 : std::min((nowTicks - lastPhysicsTicks) / 1000.0, 0.05);
             lastPhysicsTicks = nowTicks;
             justResumed = false;
 
-            SDL_GetMouseState(&mx, &my);
-            float logicalMx, logicalMy;
-            SDL_RenderWindowToLogical(renderer, mx, my, &logicalMx, &logicalMy);
-            mx = (int)logicalMx;
+            double rawMx, rawMy;
+            glfwGetCursorPos(window, &rawMx, &rawMy);
+            Point logical = gl->windowToLogical((int)rawMx, (int)rawMy);
+            mx = logical.x;
             if (mx >= 80 && mx <= 1328)
             {
                 paddel->setpos(mx - 80);
@@ -267,10 +279,11 @@ int Game::run()
                     while (eventManager.getState().gamePreEnd)
                     {
                         eventManager.pollEvents();
-                        frontend->draw_end();
-                        SDL_RenderPresent(renderer);
-                        limitFrameRate();
+                        gl->beginFrame();
                         frontend->draw_background();
+                        frontend->draw_end();
+                        gl->present(window);
+                        limitFrameRate();
                     };
                     break;
                 }
@@ -299,7 +312,7 @@ int Game::run()
                             }
                             else
                             {
-                                SDL_Rect r = current_block.r;
+                                Rect r = current_block.r;
                                 Vec2 pos = ball->get_position();
                                 double fL = pos.x - r.x, fR = r.x + r.w - pos.x;
                                 double fT = pos.y - r.y, fB = r.y + r.h - pos.y;
@@ -361,12 +374,12 @@ int Game::run()
                 bricksField->destructibleCount() <= (int)(bricksField->getDestructibleStartingSize() * 2.0f / 3.0f) &&
                 blackHole->isActive())
             {
-                SDL_Rect bhRect = blackHole->getRect();
+                Rect bhRect = blackHole->getRect();
                 Vec2 closest = closestPoint(bhRect, ball->get_position());
                 if ((ball->get_position() - closest).length() < ball->radius)
                 {
                     ballStuckInHole = true;
-                    ballStuckTime = SDL_GetTicks();
+                    ballStuckTime = nowMs();
                     ballStuckSpeed = ball->get_destination().length();
                     ball->set_destination({0.0, 0.0});
                 }
@@ -374,9 +387,9 @@ int Game::run()
 
             if (ballStuckInHole)
             {
-                SDL_Rect bhRect = blackHole->getRect();
+                Rect bhRect = blackHole->getRect();
                 ball->set_position({bhRect.x + bhRect.w / 2.0, bhRect.y + bhRect.h / 2.0});
-                if (SDL_GetTicks() - ballStuckTime >= 1000)
+                if (nowMs() - ballStuckTime >= 1000)
                 {
                     ballStuckInHole = false;
                     double angle = (std::rand() % 360) * std::numbers::pi / 180.0;
@@ -427,7 +440,7 @@ int Game::run()
                                     }
                                     else
                                     {
-                                        SDL_Rect r2 = cb.r;
+                                        Rect r2 = cb.r;
                                         Vec2 pos = ball2->get_position();
                                         double fL = pos.x-r2.x, fR = r2.x+r2.w-pos.x, fT = pos.y-r2.y, fB = r2.y+r2.h-pos.y;
                                         Vec2 pd{-1.0, 0.0}; double mp = fL;
@@ -520,14 +533,10 @@ int Game::run()
                 }
                 else
                 {
-                    SDL_Rect pr = {(int)powerUps[i].pos.x - 24, (int)powerUps[i].pos.y - 11, 48, 22};
-                    if (powerUps[i].isDuplicate)
-                        SDL_SetRenderDrawColor(renderer, 0, 150, 255, 255);
-                    else
-                        SDL_SetRenderDrawColor(renderer, 255, 120, 0, 255);
-                    SDL_RenderFillRect(renderer, &pr);
-                    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-                    SDL_RenderDrawRect(renderer, &pr);
+                    Rect pr = {(int)powerUps[i].pos.x - 24, (int)powerUps[i].pos.y - 11, 48, 22};
+                    Color fill = powerUps[i].isDuplicate ? Color{0, 150, 255, 255} : Color{255, 120, 0, 255};
+                    gl->drawColor(pr, fill);
+                    gl->drawColorOutline(pr, Color{255, 255, 255, 255});
                 }
             }
 
@@ -539,19 +548,20 @@ int Game::run()
                 blackHole->draw();
             }
             frontend->draw_hud(score, levelNumber);
-            SDL_RenderPresent(renderer);
+            gl->present(window);
             limitFrameRate();
             if (bricksField->destructibleCount() == 0)
             {
-                float elapsed = (SDL_GetTicks() - tstart) / 1000.0f;
+                float elapsed = (nowMs() - tstart) / 1000.0f;
                 eventManager.getState().gamePreEnd = true;
                 while (eventManager.getState().gamePreEnd)
                 {
                     eventManager.pollEvents();
-                    frontend->level_cleared(elapsed / std::max(1, score));
-                    SDL_RenderPresent(renderer);
-                    limitFrameRate();
+                    gl->beginFrame();
                     frontend->draw_background();
+                    frontend->level_cleared(elapsed / std::max(1, score));
+                    gl->present(window);
+                    limitFrameRate();
                 }
                 levelNumber++;
                 bricksField->load_level(levelNumber);
@@ -563,18 +573,19 @@ int Game::run()
                 ball2->setmain();
                 powerUps.clear();
                 score = 0;
-                tstart = SDL_GetTicks();
+                tstart = nowMs();
                 // Show welcome screen before next level starts
                 eventManager.getState().gameWelcome = true;
                 while (eventManager.getState().gameWelcome)
                 {
                     eventManager.pollEvents();
+                    gl->beginFrame();
                     frontend->draw_background();
                     paddel->draw();
                     bricksField->draw();
                     ball->draw();
                     frontend->draw_welcome_text();
-                    SDL_RenderPresent(renderer);
+                    gl->present(window);
                     limitFrameRate();
                 }
                 justResumed = true;
@@ -582,7 +593,7 @@ int Game::run()
         }
 
         // reset after game over to menu
-        SDL_ShowCursor(SDL_ENABLE);
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         if (!currentPlayerName.empty())
         {
             playerDb.addBlocks(currentPlayerName, totalBlocksThisRun);
@@ -594,7 +605,7 @@ int Game::run()
         eventManager.gameStateReset();
         score = 0;
         levelNumber = 0;
-        tstart = SDL_GetTicks();
+        tstart = nowMs();
         bricksField->setmain();
         ball->setmain();
         ball2->setmain();
@@ -608,41 +619,42 @@ int Game::run()
 
 void Game::applyResolution(int w, int h)
 {
-    // The logical canvas (bounds.w x bounds.h) never changes - only the
-    // window's actual pixel size does, so no renderer/texture recreation is
-    // needed. SDL letterboxes the fixed-aspect canvas to fit the new window.
-    SDL_SetWindowSize(window, w, h);
-    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-    eventManager.setLogicalScale((double)w / bounds.w, (double)h / bounds.h);
+    // The logical canvas (UILayout::ScreenW x ScreenH) never changes - only
+    // the window's actual pixel size does. GLRenderer letterboxes the fixed
+    // canvas to fit the new window; EventManager's viewport must be updated
+    // to match so mouse hit-testing still lines up.
+    glfwSetWindowSize(window, w, h);
+    centerWindow(window, w, h);
+    gl->resize(w, h);
+    eventManager.setViewport(gl->viewportX(), gl->viewportY(), gl->viewportW(), gl->viewportH());
 }
 
 void Game::limitFrameRate()
 {
     constexpr double targetFrameSeconds = 1.0 / 120.0;
-    Uint64 now = SDL_GetPerformanceCounter();
-    double elapsed = (double)(now - lastFrameCounter) / (double)frameFreq;
+    auto now = std::chrono::steady_clock::now();
+    double elapsed = std::chrono::duration<double>(now - lastFrameTime_).count();
     if (elapsed < targetFrameSeconds)
-        SDL_Delay((Uint32)((targetFrameSeconds - elapsed) * 1000.0));
-    lastFrameCounter = SDL_GetPerformanceCounter();
+        sleepMs((uint32_t)((targetFrameSeconds - elapsed) * 1000.0));
+    lastFrameTime_ = std::chrono::steady_clock::now();
 }
 
 void Game::cleanup()
 {
-    if (music)
-    {
-        Mix_FreeMusic(music);
-        music = nullptr;
-    }
-    if (renderer)
-    {
-        SDL_DestroyRenderer(renderer);
-        renderer = nullptr;
-    }
+    // Every GL-texture-owning object must be destroyed before the GL context
+    // (gl) itself, and gl must be destroyed before the window it was created
+    // on - order here matters, unlike a plain member-wise destructor.
+    blackHole.reset();
+    ball2.reset();
+    ball.reset();
+    bricksField.reset();
+    paddel.reset();
+    frontend.reset();
+    gl.reset();
     if (window)
     {
-        SDL_DestroyWindow(window);
+        glfwDestroyWindow(window);
         window = nullptr;
     }
-    Mix_CloseAudio();
-    SDL_Quit();
+    glfwTerminate();
 }

@@ -1,16 +1,17 @@
 #ifndef PADDEL_H
 #define PADDEL_H
 
-#include <SDL.h>
+#include "GLRenderer.h"
+#include "Types.h"
 
 class Paddel
 {
-    SDL_Rect nblock;
-    SDL_Texture *timg;
-    SDL_Renderer *render;
+    Rect nblock;
+    GLRenderer::Texture timg;
+    GLRenderer *gl;
 
   public:
-    Paddel(SDL_Renderer *);
+    Paddel(GLRenderer &gl_);
     ~Paddel();
     int rety();
     void setmain();

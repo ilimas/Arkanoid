@@ -2,7 +2,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <SDL_rect.h>
+#include "Types.h"
 #include <cmath>
 #include <cstdint>
 #include <ostream>
@@ -132,7 +132,7 @@ constexpr double map_range(double x, double in_min, double in_max, double out_mi
     return result;
 }
 
-inline Vec2 closestPoint(SDL_Rect block_rect, Vec2 ballPos)
+inline Vec2 closestPoint(Rect block_rect, Vec2 ballPos)
 {
     float x = std::max<float>(block_rect.x, std::min<float>(ballPos.x, block_rect.x + block_rect.w));
     float y = std::max<float>(block_rect.y, std::min<float>(ballPos.y, block_rect.y + block_rect.h));

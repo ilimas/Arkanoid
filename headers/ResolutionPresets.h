@@ -2,8 +2,8 @@
 #define RESOLUTION_PRESETS_H
 
 // Selectable window/output resolutions for the Settings screen. The game's
-// logical canvas (UILayout::ScreenW x ScreenH) never changes - SDL letterboxes
-// it to fit whatever window size is picked here, up to real 4K.
+// logical canvas (UILayout::ScreenW x ScreenH) never changes - GLRenderer
+// letterboxes it to fit whatever window size is picked here, up to real 4K.
 struct ResolutionPreset
 {
     int w;

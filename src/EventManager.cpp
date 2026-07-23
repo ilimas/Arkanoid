@@ -1,10 +1,7 @@
 #include "EventManager.h"
 #include "ResolutionPresets.h"
 #include "UILayout.h"
-#include <SDL_events.h>
-#include <SDL_keyboard.h>
-#include <SDL_mouse.h>
-#include <cstring>
+#include <GLFW/glfw3.h>
 
 GameState::GameState()
     : gameStart(false), gameWelcome(false), gamePaused(false), gameOver(false), gamePreEnd(false),
@@ -15,20 +12,22 @@ GameState::GameState()
 
 GameState &EventManager::getState() { return currentState; }
 
-void EventManager::setLogicalScale(double scaleX, double scaleY)
+void EventManager::setViewport(int vx, int vy, int vw, int vh)
 {
-    scaleX_ = scaleX;
-    scaleY_ = scaleY;
+    vpX_ = vx;
+    vpY_ = vy;
+    vpW_ = vw > 0 ? vw : 1;
+    vpH_ = vh > 0 ? vh : 1;
 }
 
 void EventManager::clearNameInput() { nameBuffer_.clear(); }
 
 std::string EventManager::getNameInputText() { return nameBuffer_; }
 
-void EventManager::toLogical(int rawX, int rawY, int &x, int &y) const
+void EventManager::toLogical(double rawX, double rawY, int &x, int &y) const
 {
-    x = (int)(rawX / scaleX_);
-    y = (int)(rawY / scaleY_);
+    x = (int)((rawX - vpX_) * (double)UILayout::ScreenW / vpW_);
+    y = (int)((rawY - vpY_) * (double)UILayout::ScreenH / vpH_);
 }
 
 void EventManager::gameStateReset()
@@ -53,57 +52,99 @@ void popUtf8Char(std::string &s)
         --i;
     s.erase(i);
 }
+
+void appendUtf8(std::string &s, unsigned int codepoint)
+{
+    if (codepoint <= 0x7F)
+    {
+        s += (char)codepoint;
+    }
+    else if (codepoint <= 0x7FF)
+    {
+        s += (char)(0xC0 | (codepoint >> 6));
+        s += (char)(0x80 | (codepoint & 0x3F));
+    }
+    else if (codepoint <= 0xFFFF)
+    {
+        s += (char)(0xE0 | (codepoint >> 12));
+        s += (char)(0x80 | ((codepoint >> 6) & 0x3F));
+        s += (char)(0x80 | (codepoint & 0x3F));
+    }
+    else
+    {
+        s += (char)(0xF0 | (codepoint >> 18));
+        s += (char)(0x80 | ((codepoint >> 12) & 0x3F));
+        s += (char)(0x80 | ((codepoint >> 6) & 0x3F));
+        s += (char)(0x80 | (codepoint & 0x3F));
+    }
+}
 } // namespace
 
-void EventManager::handleTextInputEvent(const SDL_Event &event)
+void EventManager::attachWindow(GLFWwindow *window)
+{
+    window_ = window;
+    glfwSetWindowUserPointer(window, this);
+    glfwSetCharCallback(window, &EventManager::charCallback);
+    glfwSetKeyCallback(window, &EventManager::keyCallback);
+}
+
+void EventManager::charCallback(GLFWwindow *window, unsigned int codepoint)
+{
+    static_cast<EventManager *>(glfwGetWindowUserPointer(window))->onChar(codepoint);
+}
+
+void EventManager::keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int /*mods*/)
+{
+    if (key == GLFW_KEY_BACKSPACE && (action == GLFW_PRESS || action == GLFW_REPEAT))
+        static_cast<EventManager *>(glfwGetWindowUserPointer(window))->onBackspace();
+}
+
+void EventManager::onChar(unsigned int codepoint)
 {
     if (!currentState.gameNameInput)
         return;
-    if (event.type == SDL_TEXTINPUT)
-    {
-        if (nameBuffer_.size() + strlen(event.text.text) <= 40)
-            nameBuffer_ += event.text.text;
-    }
-    else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE)
-    {
-        popUtf8Char(nameBuffer_);
-    }
+    if (nameBuffer_.size() + 4 <= 40)
+        appendUtf8(nameBuffer_, codepoint);
+}
+
+void EventManager::onBackspace()
+{
+    if (!currentState.gameNameInput)
+        return;
+    popUtf8Char(nameBuffer_);
 }
 
 void EventManager::pollEvents()
 {
-    SDL_Event event;
-    while (SDL_PollEvent(&event))
+    glfwPollEvents();
+
+    if (glfwWindowShouldClose(window_))
     {
-        if (event.type == SDL_QUIT)
-        {
-            currentState.gameMenu = false;
-            currentState.gameNameInput = false;
-            currentState.gameLeaderboard = false;
-            currentState.gameWelcome = false;
-            currentState.gamePaused = false;
-            currentState.gamePreEnd = false;
-            currentState.gameStart = false;
-            currentState.appQuit = true;
-            currentState.gameOver = true;
-            return;
-        }
-        handleTextInputEvent(event);
+        currentState.gameMenu = false;
+        currentState.gameNameInput = false;
+        currentState.gameLeaderboard = false;
+        currentState.gameWelcome = false;
+        currentState.gamePaused = false;
+        currentState.gamePreEnd = false;
+        currentState.gameStart = false;
+        currentState.appQuit = true;
+        currentState.gameOver = true;
+        return;
     }
 
-    int rawX, rawY;
-    Uint32 buttons = SDL_GetMouseState(&rawX, &rawY);
-    bool mouseLeftDown = (buttons & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
+    double rawX, rawY;
+    glfwGetCursorPos(window_, &rawX, &rawY);
+    bool mouseLeftDown = glfwGetMouseButton(window_, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
     bool clicked = mouseLeftDown && !mouseLeftDownPrev_;
     mouseLeftDownPrev_ = mouseLeftDown;
     int mx, my;
     toLogical(rawX, rawY, mx, my);
 
-    const Uint8 *keys = SDL_GetKeyboardState(nullptr);
-    bool escDown = keys[SDL_SCANCODE_ESCAPE] != 0;
+    bool escDown = glfwGetKey(window_, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     bool escPressed = escDown && !escDownPrev_;
     escDownPrev_ = escDown;
-    bool returnDown = keys[SDL_SCANCODE_RETURN] != 0;
+    bool returnDown = glfwGetKey(window_, GLFW_KEY_ENTER) == GLFW_PRESS ||
+                       glfwGetKey(window_, GLFW_KEY_KP_ENTER) == GLFW_PRESS;
     bool returnPressed = returnDown && !returnDownPrev_;
     returnDownPrev_ = returnDown;
 

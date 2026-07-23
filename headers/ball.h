@@ -2,39 +2,31 @@
 #define BALL_H
 
 #include "Bricks.h"
+#include "GLRenderer.h"
 #include "Paddel.h"
+#include "Types.h"
 #include "Utils.h"
-#include <SDL_rect.h>
-#include <SDL_render.h>
-#include <SDL_timer.h>
 #include <cstdint>
 #include <optional>
 
 class Ball
 {
     Vec2 position;
-    SDL_Renderer *render;
-    SDL_Rect bounds;
+    GLRenderer *gl;
+    Rect bounds;
     double gy, gx, ratio, alf;
     Vec2 destination{0.0, 1.0};
     int fx;
     bool fireBallActive{false};
     uint32_t fireBallEnd{0};
-    SDL_Texture *texNormal{nullptr};
-    SDL_Texture *texFire{nullptr};
+    GLRenderer::Texture texNormal;
+    GLRenderer::Texture texFire;
     double speedElapsed{0.0}; // seconds of active play since last setmain()/sync, drives the speed ramp
-
-    // Real-time GLSL path (glossy shaded sphere with a subtly pulsing
-    // specular highlight, recomputed every frame): used when
-    // GLInterop::available() and this program compiled successfully; falls
-    // back to the CPU-baked texNormal/texFire path above otherwise.
-    unsigned int shaderProgram_{0};
-    SDL_Texture *shaderTarget_{nullptr};
 
   public:
     int radius;
 
-    Ball(SDL_Rect bounds_, SDL_Renderer *ren_);
+    Ball(Rect bounds_, GLRenderer &gl_);
     ~Ball();
     bool out_of_bounds();
     bool out_of_bounds_v();
